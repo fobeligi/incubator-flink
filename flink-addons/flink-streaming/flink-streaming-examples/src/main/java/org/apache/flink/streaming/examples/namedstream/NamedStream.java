@@ -31,7 +31,6 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.Collector;
 
 public class NamedStream<T> {
-
 	
 	protected SingleOutputStreamOperator<Tuple2<T,String>, ?> ns;
 	
@@ -43,7 +42,6 @@ public class NamedStream<T> {
 	//Process the elements using a user defined flatmapfunction which for each input of type
 	// T returns collects a number of outputs of type R with the name of the output wrapped in a Tuple2<R, String>
 	public <R> NamedStream<R> process(FlatMapFunction<T, Tuple2<R, String>> function) {
-		//this.toDataStream().flatMap(function).print();
 		SingleOutputStreamOperator<Tuple2<R, String>, ?> nstr = this.toDataStream().flatMap(function);
 		return new NamedStream<R>(nstr);
 	}
@@ -52,13 +50,9 @@ public class NamedStream<T> {
 	//Tip: Instead of projection use a regular map
 	public DataStream<T> toDataStream() {
 		return this.ns.map(new MapFunction<Tuple2<T,String>,T>() {
-            /**
-			 * 
-			 */
 			private static final long serialVersionUID = 1L;
 			@Override
 			public T map(Tuple2<T, String> value) throws Exception {
-				// TODO Auto-generated method stub
 				return value.f0;
 			}
         });
@@ -71,9 +65,6 @@ public class NamedStream<T> {
 		
 		for (NamedStream<X> stream : namedStreams) {		 
 			SplitDataStream<Tuple2<X, String>> selStream  = stream.ns.split(new OutputSelector<Tuple2<X, String>>() {
-	            /**
-				 * 
-				 */
 				private static final long serialVersionUID = 1L;
 
 				@Override
@@ -86,11 +77,17 @@ public class NamedStream<T> {
 			
 			sel.add(selStream.select(name));
 		}
-		DataStream<Tuple2<X, String>> ds = sel.get(0);
-		if (sel.size()>1){
-			ds = ds.merge(sel.subList(1, sel.size()).toArray(new DataStream[0]));
+		if (sel.size()==0){
+			throw new RuntimeException("At least one NamedStream should be passed as an argument.");
 		}
-		return new NamedStream<X> ((SingleOutputStreamOperator<Tuple2<X, String>, ?>) ds);
+		else{
+			DataStream<Tuple2<X, String>> ds = sel.get(0);
+			if (sel.size()>1){
+				ds = ds.merge(sel.subList(1, sel.size()).toArray(new DataStream[0]));
+			}
+			return new NamedStream<X> ((SingleOutputStreamOperator<Tuple2<X, String>, ?>) ds);
+		}
+		
 	}
 		
 	
@@ -98,10 +95,6 @@ public class NamedStream<T> {
 	public static void main(String[] args) throws Exception {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		env.setDegreeOfParallelism(2);
-		/*		DataStream<Tuple2<Long, String>> stream1 = env.generateSequence(1, 10)
-				.map(new WithNames());
-		DataStream<Tuple2<Long, String>> stream2 = env.generateSequence(11, 20)
-				.map(new WithNames());*/
 		
 		SingleOutputStreamOperator<Tuple2<Long,String>,?> s1 = env.generateSequence(1, 10)
 				.map(new WithNames());
