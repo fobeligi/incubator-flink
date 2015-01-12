@@ -77,15 +77,18 @@ public class NamedStream<T> {
 			
 			sel.add(selStream.select(name));
 		}
+		
 		if (sel.size()==0){
 			throw new RuntimeException("At least one NamedStream should be passed as an argument.");
 		}
+		
 		DataStream<Tuple2<X, String>> ds = sel.get(0);
 		if (sel.size()>1){
 			ds = ds.merge(sel.subList(1, sel.size()).toArray(new DataStream[0]));
 		}
+		
 		return new NamedStream<X> ((SingleOutputStreamOperator<Tuple2<X, String>, ?>) ds);
-			
+		
 	}
 		
 	
