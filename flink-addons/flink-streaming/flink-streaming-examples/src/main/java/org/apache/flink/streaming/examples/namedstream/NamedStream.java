@@ -17,56 +17,106 @@
 
 package org.apache.flink.streaming.examples.namedstream;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.streaming.api.collector.OutputSelector;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
+import org.apache.flink.streaming.api.datastream.SplitDataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.Collector;
 
 public class NamedStream<T> {
-	
-	//Create a NamedStream from an appropriate DataStream
-	public NamedStream(DataStream<Tuple2<T, String>> ds) {
 
+	
+	protected SingleOutputStreamOperator<Tuple2<T,String>, ?> ns;
+	
+	
+	public NamedStream(SingleOutputStreamOperator<Tuple2<T,String>,?> ds){
+		this.ns = ds.copy();
 	}
 	
-	//Process the elements using a user defined flatmapfunction which which for each input of type
-	// T returns collects a number of outputs of type R with the name of the output wrapped ina  Tuple2<R, String>
+	//Process the elements using a user defined flatmapfunction which for each input of type
+	// T returns collects a number of outputs of type R with the name of the output wrapped in a Tuple2<R, String>
 	public <R> NamedStream<R> process(FlatMapFunction<T, Tuple2<R, String>> function) {
-		return null;
+		//this.toDataStream().flatMap(function).print();
+		SingleOutputStreamOperator<Tuple2<R, String>, ?> nstr = this.toDataStream().flatMap(function);
+		return new NamedStream<R>(nstr);
 	}
 
 	//Converts the NamedStream back to a regular stream by dropping the name field
 	//Tip: Instead of projection use a regular map
 	public DataStream<T> toDataStream() {
-		return null;
+		return this.ns.map(new MapFunction<Tuple2<T,String>,T>() {
+            /**
+			 * 
+			 */
+			private static final long serialVersionUID = 1L;
+			@Override
+			public T map(Tuple2<T, String> value) throws Exception {
+				// TODO Auto-generated method stub
+				return value.f0;
+			}
+        });
 	}
 
 	//Creates a new NamedStream by merging substreams(defined by name) of the given NamedStreams 
+	@SuppressWarnings("unchecked")
 	public static <X> NamedStream<X> mergeByName(String name, NamedStream<X>... namedStreams) {
-		return null;
-	}
+		List< DataStream< Tuple2< X, String>>> sel = new ArrayList< DataStream< Tuple2< X, String>>>();
+		
+		for (NamedStream<X> stream : namedStreams) {		 
+			SplitDataStream<Tuple2<X, String>> selStream  = stream.ns.split(new OutputSelector<Tuple2<X, String>>() {
+	            /**
+				 * 
+				 */
+				private static final long serialVersionUID = 1L;
 
+				@Override
+	            public Iterable<String> select(Tuple2<X, String> ist2) {
+	                List<String> outputs = new ArrayList<String>();
+	                outputs.add(ist2.getField(1).toString());
+	                return outputs;
+	            }
+	        });
+			
+			sel.add(selStream.select(name));
+		}
+		DataStream<Tuple2<X, String>> ds = sel.get(0);
+		if (sel.size()>1){
+			ds = ds.merge(sel.subList(1, sel.size()).toArray(new DataStream[0]));
+		}
+		return new NamedStream<X> ((SingleOutputStreamOperator<Tuple2<X, String>, ?>) ds);
+	}
+		
+	
 	@SuppressWarnings("unchecked")
 	public static void main(String[] args) throws Exception {
-
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		env.setDegreeOfParallelism(2);
-
-		DataStream<Tuple2<Long, String>> stream1 = env.generateSequence(1, 10)
+		/*		DataStream<Tuple2<Long, String>> stream1 = env.generateSequence(1, 10)
 				.map(new WithNames());
 		DataStream<Tuple2<Long, String>> stream2 = env.generateSequence(11, 20)
+				.map(new WithNames());*/
+		
+		SingleOutputStreamOperator<Tuple2<Long,String>,?> s1 = env.generateSequence(1, 10)
+				.map(new WithNames());
+		SingleOutputStreamOperator<Tuple2<Long,String>,?> s2 = env.generateSequence(11, 20)
 				.map(new WithNames());
 
-		NamedStream<Long> named1 = new NamedStream<Long>(stream1);
-		NamedStream<Long> named2 = new NamedStream<Long>(stream2);
+		NamedStream<Long> named1 = new NamedStream<Long>(s1);
+		NamedStream<Long> named2 = new NamedStream<Long>(s2);
 
 		NamedStream<Long> processed1 = named1.process(new IncrementWithNames());
 		NamedStream<Long> processed2 = named2.process(new IncrementWithNames());
-
-		NamedStream.mergeByName("even", processed1, processed2).toDataStream().print();
-
+		
+		NamedStream.mergeByName("odd", processed1, processed2).toDataStream().print();
+		
+		env.execute();
 	}	
 
 	private static class WithNames implements MapFunction<Long, Tuple2<Long, String>> {
@@ -85,8 +135,7 @@ public class NamedStream<T> {
 
 		@Override
 		public void flatMap(Long value, Collector<Tuple2<Long, String>> out) throws Exception {
-
-			Long incremented = value++;
+			Long incremented = ++value;
 			String outputName = incremented % 2 == 0 ? "even" : "odd";
 
 			out.collect(new Tuple2<Long, String>(incremented, outputName));
