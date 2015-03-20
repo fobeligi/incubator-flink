@@ -58,6 +58,13 @@ under the License.
 			<artifactId>flink-streaming-connectors</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-math3</artifactId>
+			<version>3.2</version>
+		</dependency>
+
 	</dependencies>
 
 	<build>
@@ -141,6 +148,30 @@ under the License.
                             </includes>
                         </configuration>
                     </execution>
+
+
+					<!-- LambdaTriggeredJoin -->
+					<execution>
+						<id>LambdaTriggeredJoin</id>
+						<phase>package</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+						<configuration>
+							<classifier>LambdaTriggeredJoin</classifier>
+
+							<archive>
+								<manifestEntries>
+									<program-class>org.apache.flink.streaming.examples.lambda.LambdaTriggeredJoin</program-class>
+								</manifestEntries>
+							</archive>
+
+							<includes>
+								<include>org/apache/flink/streaming/examples/lambda/*.class</include>
+							</includes>
+						</configuration>
+					</execution>
+
 
 					<!-- IncrementalLearning -->
 					<execution>
