@@ -65,6 +65,12 @@ under the License.
 			<version>3.2</version>
 		</dependency>
 
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-csv</artifactId>
+			<version>1.1</version>
+		</dependency>
+
 	</dependencies>
 
 	<build>
@@ -162,7 +168,7 @@ under the License.
 
 							<archive>
 								<manifestEntries>
-									<program-class>org.apache.flink.streaming.examples.lambda.LambdaTriggeredJoin</program-class>
+									<program-class>org.apache.flink.streaming.examples.triggeredLambda.LambdaTriggeredJoin</program-class>
 								</manifestEntries>
 							</archive>
 
@@ -567,20 +573,4 @@ under the License.
 		</pluginManagement>
 		
 	</build>
-
-	<reporting>
-		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-checkstyle-plugin</artifactId>
-				<version>2.12.1</version>
-				<configuration>
-					<configLocation>checkstyle.xml</configLocation>
-					<suppressionsLocation>checkstyle-suppressions.xml</suppressionsLocation>
-					<suppressionsFileExpression>checkstyle.suppressions.file</suppressionsFileExpression>
-				</configuration>
-			</plugin>
-		</plugins>
-	</reporting>
-
 </project>

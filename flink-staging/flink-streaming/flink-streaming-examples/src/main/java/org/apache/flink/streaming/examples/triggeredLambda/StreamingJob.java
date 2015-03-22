@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.flink.streaming.examples.lambda;
+package org.apache.flink.streaming.examples.triggeredLambda;
 
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -25,28 +25,28 @@ import org.apache.flink.streaming.api.function.source.FileMonitoringFunction;
 
 public class StreamingJob implements Runnable {
 
-    StreamExecutionEnvironment streamEnv;
-    DataSet dataSet;
+	StreamExecutionEnvironment streamEnv;
+	DataSet dataSet;
 
-    public StreamingJob(String JAR, DataSet ds) {
-        this.streamEnv = StreamExecutionEnvironment.createRemoteEnvironment(
-                "127.0.0.1", 6123, 1, JAR);
-        this.dataSet = ds;
-    }
+	public StreamingJob(String JAR, DataSet ds) {
+		this.streamEnv = StreamExecutionEnvironment.createRemoteEnvironment(
+				"127.0.0.1", 6123, 1, JAR);
+		this.dataSet = ds;
+	}
 
-    @Override
-    public void run() {
+	@Override
+	public void run() {
 
-        DataStream<Tuple2<String, Integer>> dataSetStream = streamEnv.readFileStream(
-                "file:///home/fobeligi/FlinkTmp/temp2", dataSet.getType(), 1000,
-                FileMonitoringFunction.WatchType.REPROCESS_WITH_APPENDED);
+		DataStream<Tuple2<String, Integer>> dataSetStream = streamEnv.readFileStream(
+				"file:///home/fobeligi/FlinkTmp/temp2", dataSet.getType(), 1000,
+				FileMonitoringFunction.WatchType.REPROCESS_WITH_APPENDED);
 
-        dataSetStream.print();
+		dataSetStream.print();
 //		dataSetStream.project(1).types(Integer.class).print();
-        try {
-            streamEnv.execute();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+		try {
+			streamEnv.execute();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
 }
