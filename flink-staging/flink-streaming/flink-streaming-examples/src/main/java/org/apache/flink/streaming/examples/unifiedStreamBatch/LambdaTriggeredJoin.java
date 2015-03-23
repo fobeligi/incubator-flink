@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.flink.streaming.examples.triggeredLambda;
+package org.apache.flink.streaming.examples.unifiedStreamBatch;
 
 import net.spy.memcached.compat.log.Logger;
 import net.spy.memcached.compat.log.LoggerFactory;
@@ -36,9 +36,9 @@ public class LambdaTriggeredJoin {
 		exec.start();
 
 		try {
-			BatchJob bj = new BatchJob(JAR, exec);
-			new Thread(bj).start();
-			new Thread(new StreamingJob(JAR, bj.getDataSet())).start();
+//			BatchJob bj = new BatchJob(ExecutionEnvironment.getExecutionEnvironment());
+//			new Thread(bj).start();
+//			new Thread(new StreamingJob(JAR)).start();
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {

@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.flink.streaming.examples.triggeredLambda.helpers;
+package org.apache.flink.streaming.examples.unifiedStreamBatch.helpers;
 
 import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution;
 import org.apache.commons.math3.distribution.NormalDistribution;
@@ -22,8 +22,6 @@ import org.apache.commons.math3.util.Precision;
 import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.api.java.tuple.Tuple2;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,7 +34,7 @@ public class SyntheticDataGenerator {
 	private double gaussianMean;
 	private double gaussianVariance;
 	NormalDistribution myErrorDistribution;
-	private String filePath;  // = SyntheticDataGenerator.class.getPackage().toString().replace(".", "/") + "/dataSets-files/";
+	private String filePath;
 
 	private List<Tuple> dataSet;
 
@@ -146,10 +144,10 @@ public class SyntheticDataGenerator {
 			double[] probabilities = {0.8,0.2};
 			noiseDistribution = new EnumeratedIntegerDistribution(numbers,probabilities);
 		}
-		//pattern function: y = w1*sin(x) + w2*x + error
-		//evolve distribution:
-		// 1. p(x) evolves by varying it's distribution center "gaussianMean"
-		// 2. p(y/x) evolves, by changes w2 = w2 + 1 (with a probability)
+/*		pattern function: y = w1*sin(x) + w2*x + error
+		evolve distribution:
+		1. p(x) evolves by varying it's distribution center "gaussianMean"
+		2. p(y/x) evolves, by changes w2 = w2 + 1 (with a probability)*/
 		int numberOfPoints = dataPoints/intervals_Of_Drift;
 		for (int k=0;k<intervals_Of_Drift;k++){
 			for (int i = 0; i < numberOfPoints; i++) {

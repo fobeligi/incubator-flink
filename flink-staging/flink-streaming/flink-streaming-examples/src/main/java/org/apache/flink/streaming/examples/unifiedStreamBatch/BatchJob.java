@@ -14,14 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.flink.streaming.examples.triggeredLambda;
+package org.apache.flink.streaming.examples.unifiedStreamBatch;
 
 import org.apache.flink.api.common.Plan;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.flink.api.java.io.TypeSerializerOutputFormat;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.client.LocalExecutor;
-import org.apache.flink.core.fs.FileSystem;
 
 
 public class BatchJob implements Runnable {
@@ -29,34 +28,36 @@ public class BatchJob implements Runnable {
 	private Plan plan;
 	private LocalExecutor executor;
 	private ExecutionEnvironment batchEnv;
-	private DataSet<Integer> dataSet;
+	private DataSet<Tuple2<Double, Integer>> dataSet;
 
-	public BatchJob(String JAR, LocalExecutor exec) {
-		this.executor = exec;
-		this.batchEnv = ExecutionEnvironment.createRemoteEnvironment("127.0.0.1",
-				6123, 1, JAR);
-
-		this.dataSet = batchEnv.fromElements(1000, 2000, 3000, 4000);
+	public BatchJob(ExecutionEnvironment execEnv) {
+		this.batchEnv = execEnv;
+		this.plan = execEnv.createProgramPlan();
+		this.executor = new LocalExecutor(true);
+		executor.setTaskManagerNumSlots(8);
+		try {
+			executor.start();
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
 	}
 
 	@Override
 	public void run() {
-		dataSet.write(new TypeSerializerOutputFormat<Integer>(), "/home/fobeligi/FlinkTmp/temp2",
-				FileSystem.WriteMode.OVERWRITE);
 
-		this.plan = batchEnv.createProgramPlan();
-
-		while (true) {
+		try {
+			executor.executePlan(plan);
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.exit(1);
+		}finally {
 			try {
-				executor.executePlan(plan);
-				Thread.sleep(5000);
+				executor.stop();
 			} catch (Exception e) {
 				e.printStackTrace();
+				System.exit(1);
 			}
 		}
-	}
-
-	public DataSet<Integer> getDataSet() {
-		return dataSet;
 	}
 }
