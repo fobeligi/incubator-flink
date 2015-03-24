@@ -51,7 +51,7 @@ public class LambdaPeriodicJoin {
 		StreamExecutionEnvironment streamEnvironment = StreamExecutionEnvironment.createRemoteEnvironment("127.0.0.1",
 				6123, 1, JARDependencies);
 
-		CsvReader csvR = batchEnvironment.readCsvFile("dataSet-files/exampleCSV_1.csv");
+		CsvReader csvR = batchEnvironment.readCsvFile("/home/fobeligi/dataSet-files/exampleCSV_1.csv");
 		csvR.lineDelimiter("\n");
 		DataSet<Tuple2<Double, Integer>> batchDataSet = csvR.types(Double.class, Integer.class);
 		
