@@ -17,23 +17,20 @@
 package org.apache.flink.streaming.examples.unifiedStreamBatch;
 
 import org.apache.flink.api.common.Plan;
-import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.client.LocalExecutor;
 
 
 public class BatchJob implements Runnable {
 
-	private Plan plan;
+	private static Plan plan;
 	private LocalExecutor executor;
 	private ExecutionEnvironment batchEnv;
-	private DataSet<Tuple2<Double, Integer>> dataSet;
 
 	public BatchJob(ExecutionEnvironment execEnv) {
 		this.batchEnv = execEnv;
 		this.plan = execEnv.createProgramPlan();
-		this.executor = new LocalExecutor(true);
+		this.executor = new LocalExecutor(false);
 		executor.setTaskManagerNumSlots(8);
 		try {
 			executor.start();
@@ -46,18 +43,11 @@ public class BatchJob implements Runnable {
 	@Override
 	public void run() {
 
-		try {
+		try {//start and stop in finally the executor
 			executor.executePlan(plan);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(1);
-		}finally {
-			try {
-				executor.stop();
-			} catch (Exception e) {
-				e.printStackTrace();
-				System.exit(1);
-			}
 		}
 	}
 }

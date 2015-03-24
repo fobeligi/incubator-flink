@@ -16,15 +16,12 @@
  */
 package org.apache.flink.streaming.examples.unifiedStreamBatch;
 
-import org.apache.flink.api.java.DataSet;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 
 public class StreamingJob implements Runnable {
 
-	StreamExecutionEnvironment streamEnv;
-	DataSet<Tuple2<Double,Integer>> dataSet = null;
+	private static StreamExecutionEnvironment streamEnv;
 
 	public StreamingJob(StreamExecutionEnvironment see) {
 		this.streamEnv = see;

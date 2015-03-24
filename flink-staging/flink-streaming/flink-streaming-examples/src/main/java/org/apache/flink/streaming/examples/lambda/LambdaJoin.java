@@ -17,8 +17,7 @@
 
 package org.apache.flink.streaming.examples.lambda;
 
-import net.spy.memcached.compat.log.Logger;
-import net.spy.memcached.compat.log.LoggerFactory;
+
 import org.apache.flink.api.common.Plan;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -26,16 +25,12 @@ import org.apache.flink.api.java.io.CsvReader;
 import org.apache.flink.api.java.io.TypeSerializerOutputFormat;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.client.LocalExecutor;
-import org.apache.flink.core.fs.FileSystem.WriteMode;
+import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.function.source.FileMonitoringFunction.WatchType;
-import org.apache.flink.streaming.examples.unifiedStreamBatch.BatchJob;
-
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-
+import org.apache.flink.streaming.api.function.source.FileMonitoringFunction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class LambdaJoin {
 
@@ -43,8 +38,6 @@ public class LambdaJoin {
 
 	private static final String JAR = "/home/fobeligi/workspace/incubator-flink/flink-staging/" +
 			"flink-streaming/flink-streaming-examples/target/flink-streaming-examples-0.9-SNAPSHOT-LambdaJoin.jar";
-
-
 
 
 	public static void main(String[] args) throws Exception {
@@ -60,23 +53,24 @@ public class LambdaJoin {
 
 		CsvReader csvR = batchEnv.readCsvFile("dataSet-files/exampleCSV_1.csv");
 		csvR.lineDelimiter("\n");
-		DataSet<Tuple2<Double,Integer>> ds = csvR.types(Double.class,Integer.class);
+		DataSet<Tuple2<Double, Integer>> ds = csvR.types(Double.class, Integer.class);
 
 //		DataSet<Integer> dataSet = batchEnv.readFileOfPrimitives("example.txt", Integer.class);
 		ds.write(new TypeSerializerOutputFormat<Tuple2<Double, Integer>>(), "/home/fobeligi/FlinkTmp/temp",
-				WriteMode.OVERWRITE);
+				FileSystem.WriteMode.OVERWRITE);
 		ds.print();
 
-		DataStream<Tuple2<String,Tuple2<Double,Integer>>> dataSetStream = streamEnv.readFileStream(
+		DataStream<Tuple2<String, Tuple2<Double, Integer>>> dataSetStream = streamEnv.readFileStream(
 				"file:///home/fobeligi/FlinkTmp", ds.getType(), 1000,
-				WatchType.REPROCESS_WITH_APPENDED);
+				FileMonitoringFunction.WatchType.REPROCESS_WITH_APPENDED);
 
 		dataSetStream.print();
 
 		try {
 			runPeriodically(batchEnv, 5000);
-			streamEnv.execute();
-		}catch (Exception e){
+//			streamEnv.execute();
+			new Thread(new StreamingJob(streamEnv)).start();
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
@@ -88,16 +82,17 @@ public class LambdaJoin {
 
 	private static class PeriodicJob implements Runnable {
 
+		private static LocalExecutor exec;
 		private Plan plan;
 		private long millis;
-		private static LocalExecutor exec = new LocalExecutor(false);
 
 		public PeriodicJob(ExecutionEnvironment env, long millis) {
 			this.plan = env.createProgramPlan();
 			this.millis = millis;
-			exec.setTaskManagerNumSlots(8);
+			this.exec = new LocalExecutor(false);
+			this.exec.setTaskManagerNumSlots(8);
 			try {
-				exec.start();
+				this.exec.start();
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -106,7 +101,7 @@ public class LambdaJoin {
 		@Override
 		public void run() {
 
-			if (true) {
+			while (true) {
 				try {
 					exec.executePlan(plan);
 					Thread.sleep(millis);
@@ -117,4 +112,25 @@ public class LambdaJoin {
 		}
 	}
 
+	private static class StreamingJob implements Runnable {
+
+		private static StreamExecutionEnvironment execEnv;
+
+		public StreamingJob(StreamExecutionEnvironment env) {
+
+			this.execEnv = env;
+		}
+
+		@Override
+		public void run() {
+
+			while (true) {
+				try {
+					execEnv.execute();
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		}
+	}
 }
