@@ -16,34 +16,62 @@
  */
 package org.apache.flink.streaming.examples.unifiedStreamBatch;
 
-import net.spy.memcached.compat.log.Logger;
-import net.spy.memcached.compat.log.LoggerFactory;
-import org.apache.flink.client.LocalExecutor;
+
+import org.apache.flink.api.java.DataSet;
+import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.io.CsvReader;
+import org.apache.flink.api.java.io.TypeSerializerOutputFormat;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.core.fs.FileSystem;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.function.source.FileMonitoringFunction;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 
 public class LambdaTriggeredJoin {
 
-	private static final Logger log = LoggerFactory.getLogger(LambdaTriggeredJoin.class);
+	private static final org.apache.log4j.Logger log = org.apache.log4j.Logger.getLogger(LambdaPeriodicJoin.class);
 
-	private static final String JAR = "/home/fobeligi/workspace/incubator-flink/flink-staging/flink-streaming/flink-streaming-examples/target/flink-streaming-examples-0.9-SNAPSHOT-LambdaTriggeredJoin.jar";
+	private static final String JARDependencies = "/home/fobeligi/workspace/incubator-flink/flink-staging/" +
+			"flink-streaming/flink-streaming-examples/target/flink-streaming-examples-0.9-SNAPSHOT-LambdaTriggeredJoin.jar";
 
-	public static LocalExecutor exec = new LocalExecutor(false);
+	// schedule batch job to run periodically and streamJob to run continuously
+	private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
 
 
 	public static void main(String[] args) throws Exception {
 
-		exec.setTaskManagerNumSlots(4);
-		exec.start();
+		ExecutionEnvironment batchEnvironment = ExecutionEnvironment.createRemoteEnvironment("127.0.0.1",
+				6123, 1, JARDependencies);
 
-		try {
-//			BatchJob bj = new BatchJob(ExecutionEnvironment.getExecutionEnvironment());
-//			new Thread(bj).start();
-//			new Thread(new StreamingJob(JAR)).start();
-		} catch (Exception e) {
-			e.printStackTrace();
-		} finally {
-			exec.stop();
-		}
+		StreamExecutionEnvironment streamEnvironment = StreamExecutionEnvironment.createRemoteEnvironment("127.0.0.1",
+				6123, 1, JARDependencies);
+
+		CsvReader csvR = batchEnvironment.readCsvFile("dataSet-files/exampleCSV_1.csv");
+		csvR.lineDelimiter("\n");
+		DataSet<Tuple2<Double, Integer>> batchDataSet = csvR.types(Double.class, Integer.class);
+
+		batchDataSet.write(new TypeSerializerOutputFormat<Tuple2<Double, Integer>>(), "/home/fobeligi/FlinkTmp/temp",
+				FileSystem.WriteMode.OVERWRITE);
+
+		batchDataSet.print();
+
+		DataStream<Tuple2<String, Tuple2<Double, Integer>>> dataSetStream = streamEnvironment.readFileStream(
+				"file:///home/fobeligi/FlinkTmp/temp", batchDataSet.getType(), 1000,
+				FileMonitoringFunction.WatchType.REPROCESS_WITH_APPENDED);
+
+		dataSetStream.print();
+
+		BatchJob periodicBatchJob = new BatchJob(batchEnvironment);
+		final ScheduledFuture batchHandler = scheduler.scheduleWithFixedDelay(periodicBatchJob, 0, 5000, TimeUnit.MILLISECONDS);
+
+		StreamingJob streamingJob = new StreamingJob(streamEnvironment);
+		final ScheduledFuture streamHandler = scheduler.schedule(streamingJob, 0, TimeUnit.MILLISECONDS);
 
 	}
 

@@ -62,7 +62,7 @@ public class LambdaPeriodicJoin {
 			public void run() {
 				batchHandler.cancel(true);
 			}
-		}, 3600, TimeUnit.MINUTES);
+		}, 60, TimeUnit.MINUTES);
 
 	}
 }
