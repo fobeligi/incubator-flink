@@ -25,13 +25,11 @@ public class BatchJob implements Runnable {
 
 	private static Plan plan;
 	private LocalExecutor executor;
-	private ExecutionEnvironment batchEnv;
 
 	public BatchJob(ExecutionEnvironment execEnv) {
-		this.batchEnv = execEnv;
 		this.plan = execEnv.createProgramPlan();
 		this.executor = new LocalExecutor(false);
-		executor.setTaskManagerNumSlots(8);
+		executor.setTaskManagerNumSlots(4);
 		try {
 			executor.start();
 		} catch (Exception e) {

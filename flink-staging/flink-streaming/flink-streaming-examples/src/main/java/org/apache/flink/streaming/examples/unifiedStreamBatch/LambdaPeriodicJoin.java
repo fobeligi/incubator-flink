@@ -1,4 +1,4 @@
-package org.apache.flink.streaming.examples.unifiedStreamBatch.helpers;
+package org.apache.flink.streaming.examples.unifiedStreamBatch;
 
 
 import org.apache.flink.api.java.DataSet;
@@ -10,8 +10,6 @@ import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.function.source.FileMonitoringFunction;
-import org.apache.flink.streaming.examples.unifiedStreamBatch.BatchJob;
-import org.apache.flink.streaming.examples.unifiedStreamBatch.StreamingJob;
 import org.apache.log4j.Logger;
 
 import java.util.concurrent.Executors;
@@ -27,7 +25,7 @@ public class LambdaPeriodicJoin {
 			"flink-streaming/flink-streaming-examples/target/flink-streaming-examples-0.9-SNAPSHOT-LambdaPeriodicJoin.jar";
 
 	// schedule batch job to run periodically and streamJob to run continuously
-	private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+	private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
 
 
 	public static void main(String[] args) throws Exception {
@@ -57,7 +55,7 @@ public class LambdaPeriodicJoin {
 		final ScheduledFuture batchHandler = scheduler.scheduleWithFixedDelay(periodicBatchJob, 0, 5000, TimeUnit.MILLISECONDS);
 
 		StreamingJob streamingJob = new StreamingJob(streamEnvironment);
-		final ScheduledFuture streamHandler = scheduler.schedule(streamingJob, 5000, TimeUnit.MILLISECONDS);
+		final ScheduledFuture streamHandler = scheduler.schedule(streamingJob, 1000, TimeUnit.MILLISECONDS);
 //		run batch job periodically for an hour
 		scheduler.schedule(new Runnable() {
 			@Override
@@ -65,5 +63,6 @@ public class LambdaPeriodicJoin {
 				batchHandler.cancel(true);
 			}
 		}, 3600, TimeUnit.MINUTES);
+
 	}
 }
