@@ -20,11 +20,13 @@ import org.apache.flink.api.common.Plan;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.client.LocalExecutor;
 
+import java.io.Serializable;
 
-public class BatchJob implements Runnable {
+
+public class BatchJob implements Runnable, Serializable {
 
 	private static Plan plan;
-	private LocalExecutor executor;
+	private transient LocalExecutor executor;
 
 	public BatchJob(ExecutionEnvironment execEnv) {
 		this.plan = execEnv.createProgramPlan();
@@ -42,6 +44,7 @@ public class BatchJob implements Runnable {
 	public void run() {
 
 		try {//start and stop in finally the executor
+			System.out.println("-------------------------------Thread called!!!!---------------------------");
 			executor.executePlan(plan);
 		} catch (Exception e) {
 			e.printStackTrace();

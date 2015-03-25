@@ -18,8 +18,10 @@ package org.apache.flink.streaming.examples.unifiedStreamBatch;
 
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
+import java.io.Serializable;
 
-public class StreamingJob implements Runnable {
+
+public class StreamingJob implements Runnable, Serializable {
 
 	private static StreamExecutionEnvironment streamEnv;
 

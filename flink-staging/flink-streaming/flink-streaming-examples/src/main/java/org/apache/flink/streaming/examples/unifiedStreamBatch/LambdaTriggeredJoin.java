@@ -17,20 +17,22 @@
 package org.apache.flink.streaming.examples.unifiedStreamBatch;
 
 
+import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.io.CsvReader;
 import org.apache.flink.api.java.io.TypeSerializerOutputFormat;
+import org.apache.flink.api.java.tuple.Tuple1;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.function.source.FileMonitoringFunction;
+import org.apache.flink.util.Collector;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 
 
 public class LambdaTriggeredJoin {
@@ -43,13 +45,14 @@ public class LambdaTriggeredJoin {
 	// schedule batch job to run periodically and streamJob to run continuously
 	private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
 
+	static BatchJob periodicBatchJob;
 
 	public static void main(String[] args) throws Exception {
 
 		ExecutionEnvironment batchEnvironment = ExecutionEnvironment.createRemoteEnvironment("127.0.0.1",
 				6123, 1, JARDependencies);
 
-		StreamExecutionEnvironment streamEnvironment = StreamExecutionEnvironment.createRemoteEnvironment("127.0.0.1",
+		final StreamExecutionEnvironment streamEnvironment = StreamExecutionEnvironment.createRemoteEnvironment("127.0.0.1",
 				6123, 1, JARDependencies);
 
 		CsvReader csvR = batchEnvironment.readCsvFile("/home/fobeligi/dataSet-files/exampleCSV_1.csv");
@@ -59,19 +62,39 @@ public class LambdaTriggeredJoin {
 		batchDataSet.write(new TypeSerializerOutputFormat<Tuple2<Double, Integer>>(), "/home/fobeligi/FlinkTmp/temp",
 				FileSystem.WriteMode.OVERWRITE);
 
-		batchDataSet.print();
+		batchDataSet.writeAsText("/home/fobeligi/FlinkTmp/text", FileSystem.WriteMode.OVERWRITE);
 
+		batchDataSet.print();
+		
 		DataStream<Tuple2<String, Tuple2<Double, Integer>>> dataSetStream = streamEnvironment.readFileStream(
 				"file:///home/fobeligi/FlinkTmp/temp", batchDataSet.getType(), 1000,
 				FileMonitoringFunction.WatchType.REPROCESS_WITH_APPENDED);
 
 		dataSetStream.print();
+		SingleOutputStreamOperator ds = dataSetStream.project(1).types(Tuple2.class);
 
-		BatchJob periodicBatchJob = new BatchJob(batchEnvironment);
-		final ScheduledFuture batchHandler = scheduler.scheduleWithFixedDelay(periodicBatchJob, 0, 5000, TimeUnit.MILLISECONDS);
 
-		StreamingJob streamingJob = new StreamingJob(streamEnvironment);
-		final ScheduledFuture streamHandler = scheduler.schedule(streamingJob, 0, TimeUnit.MILLISECONDS);
+		periodicBatchJob = new BatchJob(batchEnvironment);
+		//DetectDrift dd = new DetectDrift(periodicBatchJob);
+
+		DataStream d = ds.flatMap(new FlatMapFunction<Tuple1<Tuple2<Double,Integer>>,Tuple2<Double,Integer>>() {
+
+			@Override
+			public void flatMap(Tuple1<Tuple2<Double,Integer>> value, Collector<Tuple2<Double, Integer>> out) throws Exception {
+				if (value.f0.f0 == 0.0) {
+					new Thread(periodicBatchJob).start();
+				} else {
+					out.collect(new Tuple2<Double, Integer>(value.f0.f0, value.f0.f1 + 1));
+				}
+			}
+		});
+		d.print();
+
+//		DataStream f = newData.transform("driftDetection",dataSetStream.getType(),dd);
+//		f.print();
+
+
+		streamEnvironment.execute();
 
 	}
 
