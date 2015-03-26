@@ -28,13 +28,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class FileParser {
+public class Utils {
 
 	private static String COMMA_DELIMITER = ",";
 	private static String NEW_LINE_SEPARATOR = "\n";
 	private static String TEXT_FILE_DELIMITER = "\t";
 
-	public FileParser() {
+	public Utils() {
 	}
 
 	public void dataSetToTextFile(List<Tuple> dataSet, String filename) {
