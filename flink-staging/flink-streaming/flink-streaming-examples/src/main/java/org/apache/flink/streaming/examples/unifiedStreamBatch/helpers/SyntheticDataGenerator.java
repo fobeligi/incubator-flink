@@ -89,8 +89,8 @@ public class SyntheticDataGenerator {
 	private void loadProperties() {
 		properties= new Properties();
 		try{
-			FileInputStream propertiesFile = new FileInputStream("/home/fobeligi/workspace/incubator-flink/flink-staging/" +
-					"flink-streaming/flink-streaming-examples/src/main/resources/config.properties");
+
+			InputStream propertiesFile = getClass().getClassLoader().getResourceAsStream("config.properties");
 			properties.load(propertiesFile);
 			withDrift = Boolean.getBoolean(properties.getProperty("with.drift"));
 			if (withDrift){
