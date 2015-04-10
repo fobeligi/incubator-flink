@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.flink.ml.preprocess
+package org.apache.flink.ml.preprocessing
 
 import org.apache.flink.api.scala._
 import org.apache.flink.ml.math.{Vector, DenseVector}

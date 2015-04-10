@@ -16,9 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.preprocess
-
-import java.util
+package org.apache.flink.ml.preprocessing
 
 import breeze.linalg._
 import breeze.numerics.sqrt
@@ -27,11 +25,11 @@ import org.apache.flink.api.scala._
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.ml.common.{Parameter, ParameterMap, Transformer}
 import org.apache.flink.ml.math.Breeze._
-import org.apache.flink.ml.math.{Vector}
-import org.apache.flink.ml.preprocess.StandardScaler.{Mean, Std, DataSetSize}
+import org.apache.flink.ml.math.Vector
+import org.apache.flink.ml.preprocessing.StandardScaler.{Mean, Std, DataSetSize}
 
 
-//TODO::Example code here. Also a parameter description.
+//TODO::Example code here
 /** Scales observations, so that all features have mean equal to zero
   * and standard deviation equal to one
   *
@@ -44,10 +42,10 @@ import org.apache.flink.ml.preprocess.StandardScaler.{Mean, Std, DataSetSize}
   *
   * @example
   * {{{
-  *                  val trainingDS: DataSet[Vector] = env.fromCollection(data)
+  *                   val trainingDS: DataSet[Vector] = env.fromCollection(data)
   *
-  *                  val scaler = StandardScaler().setDataSetSize(data.length)
-  *                    .setMean(false)
+  *                   val scaler = StandardScaler().setDataSetSize(data.length)
+  *                     .setMean(false)
 
   * }}}
   *
@@ -112,17 +110,17 @@ class StandardScaler extends Transformer[Vector, Vector] with Serializable {
   }
 
 
-  private def calculateFeaturesMean(input: DataSet[Vector], size: Int): DataSet[Vector] = {
-    input.reduce(new ReduceFunction[Vector] {
-      override def reduce(vector1: Vector, vector2: Vector): Vector = {
-        return (vector1.asBreeze + vector2.asBreeze).fromBreeze
-      }
-    }).map(new MapFunction[Vector, Vector] {
-      override def map(vector: Vector): Vector = {
-        return ((vector.asBreeze) :/ size.asInstanceOf[Double]).fromBreeze
-      }
-    })
-  }
+    private def calculateFeaturesMean(input: DataSet[Vector], size: Int): DataSet[Vector] = {
+      input.reduce(new ReduceFunction[Vector] {
+        override def reduce(vector1: Vector, vector2: Vector): Vector = {
+          return (vector1.asBreeze + vector2.asBreeze).fromBreeze
+        }
+      }).map(new MapFunction[Vector, Vector] {
+        override def map(vector: Vector): Vector = {
+          return ((vector.asBreeze) :/ size.asInstanceOf[Double]).fromBreeze
+        }
+      })
+    }
 
   private def calculateFeaturesStd(input: DataSet[Vector], featuresMean: Vector, size: Int) = {
     input.map(new MapFunction[Vector, Vector] {
@@ -143,37 +141,6 @@ class StandardScaler extends Transformer[Vector, Vector] with Serializable {
         return variance
       }
     })
-  }
-
-
-  /** Scales the vector to zero mean and unit variance
-    *
-    * @param vector
-    * @param sMean
-    * @param sStd
-    */
-  private def scaleVector(vector: Vector, sMean: Boolean, sStd: Boolean): Vector = {
-
-    var myVector = vector.asBreeze
-
-    val mean = sum(myVector) / myVector.length
-    //  Standard deviation of the vector
-    val t = myVector :- mean
-    var std = math.sqrt(sum(t :* t) / myVector.length)
-    if (std == 0.0) {
-      std = 1.0
-    }
-
-    if (sMean) {
-      myVector :-= mean
-      if (sStd) {
-        myVector :/= std
-      }
-    }
-    else if (sStd) {
-      myVector :/= std
-    }
-    myVector.fromBreeze
   }
 }
 
