@@ -276,7 +276,8 @@ class DataStream[T](javaStream: JavaStream[T]) {
    *
    *
    */
-  def iterate[R](stepFunction: DataStream[T] => (DataStream[T], DataStream[R])): DataStream[R] = {
+  def iterate[R](stepFunction: DataStream[T] => (DataStream[T], DataStream[R]),
+      				keepPartitioning: Boolean = false): DataStream[R] = {
     iterate(0)(stepFunction)
   }
 
@@ -299,11 +300,12 @@ class DataStream[T](javaStream: JavaStream[T]) {
    *
    */
   def iterate[R](maxWaitTimeMillis:Long = 0)
-                (stepFunction: DataStream[T] => (DataStream[T], DataStream[R])) : DataStream[R] = {
+                (stepFunction: DataStream[T] => (DataStream[T], DataStream[R]), 
+                    keepPartitioning: Boolean = false) : DataStream[R] = {
     val iterativeStream = javaStream.iterate(maxWaitTimeMillis)
 
     val (feedback, output) = stepFunction(new DataStream[T](iterativeStream))
-    iterativeStream.closeWith(feedback.getJavaStream)
+    iterativeStream.closeWith(feedback.getJavaStream, keepPartitioning)
     output
   }
 

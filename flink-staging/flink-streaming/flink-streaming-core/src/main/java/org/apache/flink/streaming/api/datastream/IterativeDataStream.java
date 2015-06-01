@@ -37,6 +37,24 @@ public class IterativeDataStream<IN> extends
 		iterationWaitTime = maxWaitTime;
 	}
 
+	
+	public DataStream<IN> closeWith(DataStream<IN> iterationTail, boolean keepPartitioning) {
+		DataStream<IN> iterationSink = new DataStreamSink<IN>(environment, "Iteration Sink", null,
+				null);
+
+		// We add an iteration sink to the tail which will send tuples to the
+		// iteration head
+		streamGraph.addIterationTail(iterationSink.getId(), iterationTail.getId(), iterationID,
+				iterationWaitTime);
+
+		if (keepPartitioning) {
+			connectGraph(iterationTail, iterationSink.getId(), 0);
+		} else {
+			connectGraph(iterationTail.forward(), iterationSink.getId(), 0);
+		}
+		return iterationTail;
+	}
+	
 	/**
 	 * Closes the iteration. This method defines the end of the iterative
 	 * program part that will be fed back to the start of the iteration. </br>
@@ -53,15 +71,6 @@ public class IterativeDataStream<IN> extends
 	 * 
 	 */
 	public DataStream<IN> closeWith(DataStream<IN> iterationTail) {
-		DataStream<IN> iterationSink = new DataStreamSink<IN>(environment, "Iteration Sink", null,
-				null);
-
-		// We add an iteration sink to the tail which will send tuples to the
-		// iteration head
-		streamGraph.addIterationTail(iterationSink.getId(), iterationTail.getId(), iterationID,
-				iterationWaitTime);
-
-		connectGraph(iterationTail.forward(), iterationSink.getId(), 0);
-		return iterationTail;
+		return closeWith(iterationTail,false);
 	}
 }

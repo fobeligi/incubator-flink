@@ -123,9 +123,9 @@ public class IterateTest {
 		AbstractJobVertex tailOp = null;
 
 		for (AbstractJobVertex vertex : graph.getVertices()) {
-			if (vertex.getName().contains("IterationHead")) {
+			if (vertex.getName().contains("IterationSource")) {
 				itSource = vertex;
-			} else if (vertex.getName().contains("IterationTail")) {
+			} else if (vertex.getName().contains("IterationSink")) {
 				itSink = vertex;
 			} else if (vertex.getName().contains("HeadOperator")) {
 				headOp = vertex;
