@@ -91,7 +91,7 @@ class VeryFastDecisionTree(
         resultingParameters)
       prequentialEvaluation = preqEvalStream
       (feedback, output)
-    })
+    },true)
     prequentialEvaluation
   }
 

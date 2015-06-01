@@ -47,7 +47,7 @@ public class IterativeDataStream<IN> extends
 		streamGraph.addIterationTail(iterationSink.getId(), iterationTail.getId(), iterationID,
 				iterationWaitTime);
 
-		if (true) {
+		if (keepPartitioning) {
 			connectGraph(iterationTail, iterationSink.getId(), 0);
 		} else {
 			connectGraph(iterationTail.forward(), iterationSink.getId(), 0);
