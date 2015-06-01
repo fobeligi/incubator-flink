@@ -24,7 +24,7 @@ import org.apache.flink.streaming.incrementalML.classification.Metrics.Attribute
 import scala.collection.mutable
 
 
-object DecisionTreeModel
+class DecisionTreeModel
   extends Serializable {
 
   var decisionTree: mutable.Map[Int, DTNode] = mutable.HashMap[Int, DTNode]()
@@ -120,8 +120,8 @@ object DecisionTreeModel
       //      System.err.println(s"node: $nodeToSplit, excludingAttr:$attributesToExclude")
       val newNodes = nodeToSplit.splitNode(splitAttribute, attrType, splitValue, infoGain,
         attributesToExclude, decisionTree.size - 1)
-      nodeToSplit.isLeaf = false
       decisionTree = decisionTree ++ newNodes
+      nodeToSplit.isLeaf = false
     }
 
   }
@@ -153,7 +153,14 @@ object DecisionTreeModel
   }
 
   def nodeIsLeaf(node: Int): Boolean = {
-    decisionTree.apply(node).isLeaf
+    var res = true
+    decisionTree.getOrElse(node,None) match {
+      case n: DTNode =>
+        res = n.isLeaf
+      case None =>
+        res = false
+    }
+    res
   }
 
   def getDecisionTreeSize: Int = {

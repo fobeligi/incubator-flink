@@ -41,12 +41,12 @@ class VeryFastDecisionTreeITSuite
 
     parameters.add(VeryFastDecisionTree.MinNumberOfInstances, 300)
     parameters.add(VeryFastDecisionTree.NumberOfClasses, 4)
-    parameters.add(VeryFastDecisionTree.Parallelism, 8)
+    parameters.add(VeryFastDecisionTree.Parallelism, 2)
 
 //    parameters.add(VeryFastDecisionTree.OnlyNominalAttributes,true)
     //    parameters.add(VeryFastDecisionTree.NominalAttributes, nominalAttributes)
 
-    val dataPoints = env.readTextFile("/Users/fobeligi/Documents/dataSets/randomRBF-10M.arff").map {
+    val dataPoints = env.readTextFile("/Users/fobeligi/workspace/master-thesis/dataSets/randomRBF/randomRBF-10M.arff").map {
       line => {
         var featureList = Vector[Double]()
         val features = line.split(',')
@@ -92,7 +92,7 @@ class VeryFastDecisionTreeITSuite
 
     val streamToEvaluate = vfdtLearner.fit(dataPoints, parameters)
 
-    evaluator.evaluate(streamToEvaluate).writeAsText("/Users/fobeligi/Documents/dataSets/randomRBF-10M-result.txt").setParallelism(1)
+    evaluator.evaluate(streamToEvaluate).writeAsText("/Users/fobeligi/workspace/master-thesis/dataSets/randomRBF/randomRBF-10M-parall_3_8.txt").setParallelism(1)
 
     env.execute()
   }
