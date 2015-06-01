@@ -92,7 +92,7 @@ class VeryFastDecisionTreeITSuite
 
     val streamToEvaluate = vfdtLearner.fit(dataPoints, parameters)
 
-    evaluator.evaluate(streamToEvaluate).writeAsText("/Users/fobeligi/workspace/master-thesis/dataSets/randomRBF/randomRBF-10M-parall_3_8.txt").setParallelism(1)
+    evaluator.evaluate(streamToEvaluate).writeAsText("/Users/fobeligi/workspace/master-thesis/dataSets/randomRBF/2_randomRBF-10M-parall_3_8.txt").setParallelism(1)
 
     env.execute()
   }
