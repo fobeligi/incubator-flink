@@ -140,7 +140,7 @@ class VeryFastDecisionTree(
       }
     })
 
-    val feedback: DataStream[Metrics] = splitDs.select("feedback")
+    val feedback: DataStream[Metrics] = splitDs.select("feedback").broadcast
     val output: DataStream[Metrics] = splitDs.select("output")
     (feedback, output, prequentialEvaluationStream)
   }

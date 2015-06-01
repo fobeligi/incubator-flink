@@ -39,9 +39,9 @@ class VeryFastDecisionTreeITSuite
     val parameters = ParameterMap()
     //    val nominalAttributes = Map(0 ->4, 2 ->4, 4 ->4, 6 ->4 8 ->4)
 
-    parameters.add(VeryFastDecisionTree.MinNumberOfInstances, 300)
+    parameters.add(VeryFastDecisionTree.MinNumberOfInstances, 60)
     parameters.add(VeryFastDecisionTree.NumberOfClasses, 4)
-    parameters.add(VeryFastDecisionTree.Parallelism, 2)
+    parameters.add(VeryFastDecisionTree.Parallelism, 8)
 
 //    parameters.add(VeryFastDecisionTree.OnlyNominalAttributes,true)
     //    parameters.add(VeryFastDecisionTree.NominalAttributes, nominalAttributes)
@@ -92,7 +92,7 @@ class VeryFastDecisionTreeITSuite
 
     val streamToEvaluate = vfdtLearner.fit(dataPoints, parameters)
 
-    evaluator.evaluate(streamToEvaluate).writeAsText("/Users/fobeligi/workspace/master-thesis/dataSets/randomRBF/2_randomRBF-10M-parall_3_8.txt").setParallelism(1)
+    evaluator.evaluate(streamToEvaluate).writeAsText("/Users/fobeligi/workspace/master-thesis/dataSets/randomRBF/randomRBF-10M-parall_2_8-signal_60.txt").setParallelism(1)
 
     env.execute()
   }
