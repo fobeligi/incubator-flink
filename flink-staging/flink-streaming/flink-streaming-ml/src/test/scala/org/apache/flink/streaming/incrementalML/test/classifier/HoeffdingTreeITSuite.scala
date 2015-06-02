@@ -20,12 +20,12 @@ package org.apache.flink.streaming.incrementalML.test.classifier
 import org.apache.flink.ml.common.{LabeledVector, ParameterMap}
 import org.apache.flink.ml.math.DenseVector
 import org.apache.flink.streaming.api.scala._
-import org.apache.flink.streaming.incrementalML.classification.VeryFastDecisionTree
+import org.apache.flink.streaming.incrementalML.classification.HoeffdingTree
 import org.apache.flink.streaming.incrementalML.evaluator.PrequentialEvaluator
 import org.apache.flink.test.util.FlinkTestBase
 import org.scalatest.{FlatSpec, Matchers}
 
-class VeryFastDecisionTreeITSuite
+class HoeffdingTreeITSuite
   extends FlatSpec
   with Matchers
   with FlinkTestBase {
@@ -39,14 +39,14 @@ class VeryFastDecisionTreeITSuite
     val parameters = ParameterMap()
     //    val nominalAttributes = Map(0 ->4, 2 ->4, 4 ->4, 6 ->4 8 ->4)
 
-    parameters.add(VeryFastDecisionTree.MinNumberOfInstances, 60)
-    parameters.add(VeryFastDecisionTree.NumberOfClasses, 4)
-    parameters.add(VeryFastDecisionTree.Parallelism, 8)
+    parameters.add(HoeffdingTree.MinNumberOfInstances, 150)
+    parameters.add(HoeffdingTree.NumberOfClasses, 3)
+    parameters.add(HoeffdingTree.Parallelism, 8)
 
 //    parameters.add(VeryFastDecisionTree.OnlyNominalAttributes,true)
     //    parameters.add(VeryFastDecisionTree.NominalAttributes, nominalAttributes)
 
-    val dataPoints = env.readTextFile("/Users/fobeligi/workspace/master-thesis/dataSets/randomRBF/randomRBF-10M.arff").map {
+    val dataPoints = env.readTextFile("/Users/fobeligi/workspace/master-thesis/dataSets/Waveform-MOA/Waveform-10M.arff").map {
       line => {
         var featureList = Vector[Double]()
         val features = line.split(',')
@@ -55,36 +55,13 @@ class VeryFastDecisionTreeITSuite
         }
 
         LabeledVector(features(features.size - 1).trim.toDouble, DenseVector(featureList.toArray))
-//          features(i).trim
-//          match {
-//            case "?" =>
-//              featureList = featureList :+ Double.NaN
-//            case _ => {
-              //              if (nominalAttributes.contains(i)) {
-              ////                val temp =  MurmurHash3.stringHash(features(i)).toDouble
-              ////                System.err.println(features(i) + "->" +temp)
-              //                featureList = featureList :+ MurmurHash3.stringHash(features(i))
-              // .toDouble
-              //              }
-              //              else {
-//              featureList = featureList :+ features(i).toDouble
-              //              }
-//          }
-//        }
-        //        val vector = if (features(features.size - 1).trim equals ">50K") {
-        //          LabeledVector(1, DenseVector(featureList.toArray))
-        //        }
-        //        else {
-        //          LabeledVector(-1, DenseVector(featureList.toArray))
-        //        }
-//        LabeledVector(features(0).trim.toDouble, DenseVector(featureList.toArray))
       }
     }
 
 //        val dataPoints = StreamingMLUtils.readLibSVM(env,"/Users/fobeligi/Documents/dataSets/forestCovertype/covtype.libsvm.binary.scale", 54)
 
     //    val transformer = Imputer()
-    val vfdtLearner = VeryFastDecisionTree(env)
+    val vfdtLearner = HoeffdingTree(env)
     val evaluator = PrequentialEvaluator()
 
     //    val vfdtChainedLearner = new ChainedLearner[LabeledVector, LabeledVector, (Int, Metrics)](
@@ -92,7 +69,9 @@ class VeryFastDecisionTreeITSuite
 
     val streamToEvaluate = vfdtLearner.fit(dataPoints, parameters)
 
-    evaluator.evaluate(streamToEvaluate).writeAsText("/Users/fobeligi/workspace/master-thesis/dataSets/randomRBF/randomRBF-10M-parall_2_8-signal_60.txt").setParallelism(1)
+//    evaluator.evaluate(streamToEvaluate).writeAsCsv("/Users/fobeligi/workspace/master-thesis/dataSets/Waveform-MOA/testCsv").setParallelism(1)
+
+    evaluator.evaluate(streamToEvaluate).writeAsText("/Users/fobeligi/workspace/master-thesis/dataSets/Waveform-MOA/testTxt").setParallelism(1)
 
     env.execute()
   }
