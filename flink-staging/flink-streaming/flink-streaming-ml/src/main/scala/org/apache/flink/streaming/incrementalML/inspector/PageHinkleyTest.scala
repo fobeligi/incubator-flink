@@ -53,26 +53,28 @@ class PageHinkleyTest
     val delta = resultingParameters.apply(Delta)
     val lambda = resultingParameters.apply(Lambda)
 
-    var mean: Double = 0.0
-    var pointsSeen: Int = 0
-    var cumulativeSum: Double = 0
-    var minValue: Double = Double.MaxValue
+    var mean = 0.0D
+    var pointsSeen = 0
+    var cumulativeSum = 0.0D
+    var minValue = Double.MaxValue
     var changeDetected = false
 
     val res = inputPoints.map{point =>
       pointsSeen +=1
-      mean += (point - mean) / pointsSeen
-      cumulativeSum += point - mean - delta
+      mean += point
+      cumulativeSum += point - (mean/pointsSeen) - delta
 
       //TODO::Possible refactoring -> start checking for change detection after a # of instances
       // have been seen
       //if (pointsSeen > minInstances)
+
       // update minValue if needed
       if (cumulativeSum < minValue) {
         minValue = cumulativeSum
       }
       if (cumulativeSum - minValue > lambda) {
         changeDetected = true
+        System.err.println(s"-----$pointsSeen")
         //change detected  -> reset change detector
         minValue = Double.MaxValue
         mean = 0.0

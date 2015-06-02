@@ -24,10 +24,10 @@ import org.apache.flink.api.common.functions.{FilterFunction, FlatMapFunction}
 import org.apache.flink.ml.common.{LabeledVector, Parameter, ParameterMap}
 import org.apache.flink.streaming.api.collector.selector.OutputSelector
 import org.apache.flink.streaming.api.scala._
-import org.apache.flink.streaming.incrementalML.classification.attributeObserver.{AttributeObserver,
-NominalAttributeObserver, NumericalAttributeObserver}
 import org.apache.flink.streaming.incrementalML.classification.Metrics._
 import org.apache.flink.streaming.incrementalML.classification.VerticalHoeffdingTree._
+import org.apache.flink.streaming.incrementalML.classification.attributeObserver
+.{AttributeObserver, NominalAttributeObserver, NumericalAttributeObserver}
 import org.apache.flink.streaming.incrementalML.common.{Learner, Utils}
 import org.apache.flink.util.Collector
 
@@ -96,7 +96,7 @@ class VerticalHoeffdingTree(
         resultingParameters)
       prequentialEvaluation = preqEvalStream
       (feedback, output)
-    },true)
+    }, true)
     prequentialEvaluation
   }
 
@@ -454,7 +454,7 @@ class PartialVFDTMetricsMapper(resultingParameters: ParameterMap)
               resultingParameters.apply(NumberOfClasses))
           }
           else {
-            new NumericalAttributeObserver(resultingParameters.apply(NumberOfClasses),attribute.id)
+            new NumericalAttributeObserver(resultingParameters.apply(NumberOfClasses), attribute.id)
           }
         }).updateMetricsWithAttribute(attribute)
 
@@ -474,7 +474,8 @@ class PartialVFDTMetricsMapper(resultingParameters: ParameterMap)
               for (attr <- leafToSplit) {
                 val temp = attr._2.getSplitEvaluationMetric
 
-                if (temp._2.size>0) { //if attribute_std==0, it returns an empty list
+                if (temp._2.size > 0) {
+                  //if attribute_std==0, it returns an empty list
                   bestAttributesToSplit += ((attr._1, temp))
                 }
               }
@@ -512,7 +513,7 @@ class DecisionMaker(resultingParameters: ParameterMap)
   var metricsFromLocalProcessors = mutable.HashMap[Int, mutable.Map[Int, (Int, List[(Int,
     (Double, List[Double]))])]]()
 
-  override def flatMap(value:  Metrics, out: Collector[Metrics]): Unit = {
+  override def flatMap(value: Metrics, out: Collector[Metrics]): Unit = {
 
     val evaluationMetric = value.asInstanceOf[EvaluationMetric]
     //Aggregate metrics and update global model.
@@ -567,7 +568,7 @@ class DecisionMaker(resultingParameters: ParameterMap)
       if (bestInfoGain - secondBestInfoGain > hoeffdingBoundVariable
         || hoeffdingBoundVariable < resultingParameters.apply(VfdtTau)) {
 
-        out.collect(EvaluationMetric(List(bestValuesToSplit(0)),evaluationMetric.leafId,
+        out.collect(EvaluationMetric(List(bestValuesToSplit(0)), evaluationMetric.leafId,
           evaluationMetric.signalLeafMetrics))
       }
 

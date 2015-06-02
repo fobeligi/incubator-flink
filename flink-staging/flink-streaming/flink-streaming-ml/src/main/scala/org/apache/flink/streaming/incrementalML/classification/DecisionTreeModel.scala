@@ -131,6 +131,7 @@ class DecisionTreeModel
       case treeNode: DTNode =>
         treeNode.getExcludingAttributes
       case None =>
+        System.err.println("------------------None------------")
         None
     }
   }
@@ -154,7 +155,7 @@ class DecisionTreeModel
 
   def nodeIsLeaf(node: Int): Boolean = {
     var res = true
-    decisionTree.getOrElse(node,None) match {
+    decisionTree.getOrElse(node, None) match {
       case n: DTNode =>
         res = n.isLeaf
       case None =>
@@ -221,10 +222,12 @@ case class DTNode(
     *                      [[AttributeType.Numerical]]
     * @param attrSplitValues The Value of the splitting. Applies for numerical attributes
     * @param infoGain The information gain of this splitting
+    * @param excludeAttributes Attributes to be excluded from selection for splitting attributes
+    *                          in this leaf's branch
     */
   def splitNode(splitAttr: Int, splitAttrType: AttributeType, attrSplitValues: List[Double],
-    infoGain: Double, excludeAttributes: mutable.Seq[Int], size: Int): mutable
-  .Map[Int, DTNode] = {
+    infoGain: Double, excludeAttributes: mutable.Seq[Int], size: Int):
+  mutable.Map[Int, DTNode] = {
 
     val tempNodes = mutable.HashMap[Int, DTNode]()
     val tempChildren = mutable.HashMap[Double, Int]()
@@ -235,15 +238,15 @@ case class DTNode(
     attributeSplitValue = Some(attrSplitValues)
     informationGain = infoGain
 
-    //      println(s"--------node:$nodeId, isLeaf:$isLeaf, splitAttrType:$splitAttrType, " +
-    //        s"attrSplitValues:$attrSplitValues")
 
     if (splitAttributeType.get == AttributeType.Numerical) {
       var temp = DTNode(false, true, size + 1, Some(nodeId))
+      temp.excludingAttributes = Some(excludeAttributes)
       tempNodes.put(size + 1, temp)
       tempChildren.put(0.0, size + 1)
 
       temp = DTNode(false, true, size + 2, Some(nodeId))
+      temp.excludingAttributes = Some(excludeAttributes)
       tempNodes.put(size + 2, temp)
       tempChildren.put(1.0, size + 2)
     }

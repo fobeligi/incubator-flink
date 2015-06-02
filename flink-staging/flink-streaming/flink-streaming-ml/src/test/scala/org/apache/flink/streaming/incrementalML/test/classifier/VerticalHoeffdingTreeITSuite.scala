@@ -44,15 +44,15 @@ class VerticalHoeffdingTreeITSuite
     val VHTParameters = ParameterMap()
     //    val nominalAttributes = Map(0 ->4, 2 ->4, 4 ->4, 6 ->4 8 ->4)
 
-    VHTParameters.add(VerticalHoeffdingTree.MinNumberOfInstances, 200)
+    VHTParameters.add(VerticalHoeffdingTree.MinNumberOfInstances, 60)
     VHTParameters.add(VerticalHoeffdingTree.NumberOfClasses, 3)
     VHTParameters.add(VerticalHoeffdingTree.Parallelism, 2)
-//        VHTParameters.add(VerticalHoeffdingTree.ModelParallelism, 2)
+    //        VHTParameters.add(VerticalHoeffdingTree.ModelParallelism, 2)
     //    VHTParameters.add(VerticalHoeffdingTree.OnlyNominalAttributes,true)
     //    VHTParameters.add(VerticalHoeffdingTree.NominalAttributes, nominalAttributes)
 
-    val dataPoints = env.readTextFile("/Users/fobeligi/workspace/master-thesis/dataSets/Waveform" +
-      "-MOA/Waveform-10M.arff").map {
+    val dataPoints = env.readTextFile ("/Users/fobeligi/workspace/master-thesis/dataSets/" +
+      "Waveform-MOA/Waveform-2M.arrf").map {
       line => {
         var featureList = Vector[Double]()
         val features = line.split(',')
@@ -77,16 +77,16 @@ class VerticalHoeffdingTreeITSuite
     val evaluationStream = evaluator.evaluate(streamToEvaluate)
 
     evaluationStream.writeAsCsv("/Users/fobeligi/workspace/master-thesis/dataSets/Waveform-MOA" +
-      "/Waveform-parall_1_8-result-Test.csv").setParallelism(1)
+      "/sea.csv").setParallelism(1)
 
-    val changeDetectorParameters  = ParameterMap()
-    changeDetectorParameters.add(PageHinkleyTest.Delta, 0.001)
-    changeDetectorParameters.add(PageHinkleyTest.Lambda, 2.5)
+    val changeDetectorParameters = ParameterMap()
+    changeDetectorParameters.add(PageHinkleyTest.Delta, 0.0005)
+    changeDetectorParameters.add(PageHinkleyTest.Lambda, 2.2)
 
     val changeDetector = PageHinkleyTest()
 
-    changeDetector.detectChange(evaluationStream.map(x => x._2).setParallelism(1),changeDetectorParameters).flatMap(new
-        UnifiedStreamBatchMapper()).setParallelism(1)
+    changeDetector.detectChange(evaluationStream.map(x => x._3).setParallelism(1),
+      changeDetectorParameters).flatMap(new UnifiedStreamBatchMapper()).setParallelism(1)
 
     env.execute()
   }
@@ -101,7 +101,8 @@ class UnifiedStreamBatchMapper
     val csvR: DataSet[(Double, Int)] = batchEnvironment.readCsvFile("/Users/fobeligi/workspace/" +
       "master-thesis/dataSets/UnifiedBatchStream.csv")
 
-    csvR.writeAsCsv(s"/Users/fobeligi/workspace/master-thesis/dataSets/FlinkTmp/temp$c","\n",",",FileSystem.WriteMode.OVERWRITE).setParallelism(1)
+    csvR.writeAsCsv(s"/Users/fobeligi/workspace/master-thesis/dataSets/FlinkTmp/temp$c", "\n", "," +
+      "", FileSystem.WriteMode.OVERWRITE).setParallelism(1)
     //    csvR.write(new TypeSerializerOutputFormat[(Double, Int)], "/Users/fobeligi/workspace/" +
     //      "master-thesis/dataSets/FlinkTmp/temp", FileSystem.WriteMode.OVERWRITE)
 
@@ -112,11 +113,9 @@ class UnifiedStreamBatchMapper
 
   override def flatMap(value: Boolean, out: Collector[Boolean]): Unit = {
     if (value) {
-      //      if (c==0) {
       System.err.println(value)
       createSubmitBatchJob(c);
       c += 1
-      //      }
     }
     else {
       out.collect(value)
