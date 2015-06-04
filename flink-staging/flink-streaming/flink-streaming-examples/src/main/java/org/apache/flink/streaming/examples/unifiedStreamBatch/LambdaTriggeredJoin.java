@@ -43,7 +43,7 @@ public class LambdaTriggeredJoin {
 			"flink-streaming/flink-streaming-examples/target/flink-streaming-examples-0.9-SNAPSHOT-LambdaTriggeredJoin.jar";
 
 	// Trigger batch job to run upon condition and streamJob to run continuously
-	private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
+	private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
 	static BatchJob periodicBatchJob;
 
@@ -60,11 +60,11 @@ public class LambdaTriggeredJoin {
 		DataSet<Tuple2<Double, Integer>> batchDataSet = csvR.types(Double.class, Integer.class);
 
 		batchDataSet.write(new TypeSerializerOutputFormat<Tuple2<Double, Integer>>(),
-				"/Users/fobeligi/workspace/master-thesis/dataSets/FlinkTmp/temp",
+				"/Users/fobeligi/workspace/master-thesis/dataSets/FlinkTmp/",
 				FileSystem.WriteMode.OVERWRITE);
 
 		DataStream<String> dataSetStream = streamEnvironment.readFileStream(
-				"file:///Users/fobeligi/workspace/master-thesis/dataSets/temp", 1000,
+				"file:///Users/fobeligi/workspace/master-thesis/dataSets/FlinkTmp/", 1000,
 				FileMonitoringFunction.WatchType.REPROCESS_WITH_APPENDED);
 
 		SingleOutputStreamOperator ds = dataSetStream.map(new MapFunction<String, Tuple2<Double, Integer>>() {
@@ -80,10 +80,10 @@ public class LambdaTriggeredJoin {
 //		DetectDrift detectDrift = new DetectDrift(periodicBatchJob);
 //		ds.transform("driftDetection", ds.getType(), detectDrift);
 //
-		DataStream d = ds.flatMap(new FlatMapFunction<Tuple2<Double,Integer>,Tuple2<Double,Integer>>() {
+		DataStream d = ds.flatMap(new FlatMapFunction<Tuple2<Double, Integer>, Tuple2<Double, Integer>>() {
 
 			@Override
-			public void flatMap(Tuple2<Double,Integer> value, Collector<Tuple2<Double, Integer>> out) throws Exception {
+			public void flatMap(Tuple2<Double, Integer> value, Collector<Tuple2<Double, Integer>> out) throws Exception {
 				if (value.f1 == 0.0) {
 					new Thread(periodicBatchJob).start();
 				} else {

@@ -53,19 +53,20 @@ public class LambdaPeriodicJoin {
 
 		CsvReader csvR = batchEnvironment.readCsvFile("/Users/fobeligi/workspace/master-thesis/dataSets/UnifiedBatchStream.csv");
 		csvR.lineDelimiter("\n").fieldDelimiter(",");
+
 		DataSet<Tuple2<Double, Integer>> batchDataSet = csvR.types(Double.class, Integer.class);
 		
-		batchDataSet.write(new TypeSerializerOutputFormat<Tuple2<Double, Integer>>(), "/Users/fobeligi/workspace/master-thesis/dataSets/FlinkTmp/temp",
+		batchDataSet.write(new TypeSerializerOutputFormat<Tuple2<Double, Integer>>(), "/Users/fobeligi/workspace/master-thesis/dataSets/FlinkTmp/",
 				FileSystem.WriteMode.OVERWRITE);
 
 
-		DataStream<String> dataSetStream = streamEnvironment.readFileStream("file:///Users/fobeligi/workspace/master-thesis/dataSets/temp",
+		DataStream<String> dataSetStream = streamEnvironment.readFileStream("file:///Users/fobeligi/workspace/master-thesis/dataSets/FlinkTmp/",
 				1000, FileMonitoringFunction.WatchType.REPROCESS_WITH_APPENDED);
 
 		dataSetStream.print();
 
 		BatchJob periodicBatchJob = new BatchJob(batchEnvironment);
-		final ScheduledFuture batchHandler = scheduler.scheduleWithFixedDelay(periodicBatchJob, 0, 10000, TimeUnit.MILLISECONDS);
+		final ScheduledFuture batchHandler = scheduler.scheduleWithFixedDelay(periodicBatchJob, 0, 15000, TimeUnit.MILLISECONDS);
 
 		StreamingJob streamingJob = new StreamingJob(streamEnvironment);
 		final ScheduledFuture streamHandler = scheduler.schedule(streamingJob, 1000, TimeUnit.MILLISECONDS);
@@ -76,6 +77,5 @@ public class LambdaPeriodicJoin {
 				batchHandler.cancel(true);
 			}
 		}, 60, TimeUnit.MINUTES);
-
 	}
 }
