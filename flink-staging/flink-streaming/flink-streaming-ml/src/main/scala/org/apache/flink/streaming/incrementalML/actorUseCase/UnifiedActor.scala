@@ -18,21 +18,68 @@
 package org.apache.flink.streaming.incrementalML.actorUseCase
 
 import akka.actor._
+import org.apache.flink.api.common.Plan
+import org.apache.flink.api.scala.ExecutionEnvironment
+import org.apache.flink.client.LocalExecutor
+import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 
 
-class UnifiedActor(listener: ActorRef) extends Actor{
+class UnifiedActor(
+  executionEnvironment: ExecutionEnvironment,
+  streamExecutionEnvironment: StreamExecutionEnvironment)
+  extends Actor{
 
-  def receive: Unit = {
-    case LaunchBatch =>
+  var batchState = true // idle batch processing
+  var streamingState = true // idle batch processing
 
+  val batchActor = context.actorOf(Props(new BatchActor(executionEnvironment.createProgramPlan())),
+    name = "batchActor")
+
+  val streamingActor = context.actorOf(Props(new StreamingActor(streamExecutionEnvironment)),
+    name = "streamingActor")
+
+  def receive = {
+    case message: LaunchBatch =>
+      batchState = false //batch processing working
+      batchActor ! message
+      //send message to bachProcessing
+    case message: LaunchStreaming =>
+      if (streamingState) {
+        streamingState = false
+        streamingActor ! message
+        //launch streaming
+      }
+    case message: Finished =>
+      if (!message.environmentFlag) {
+        batchState = true
+      }
+  }
+}
+
+
+class BatchActor(batchPlan: Plan) extends Actor {
+
+  val exec = new LocalExecutor()
+  exec.start()
+
+  def receive = {
+    case mes: LaunchBatch =>
+      println("--------------------------BATCH 1------------------------")
+      val result = exec.executePlan(batchPlan)
+      println(s"----result.batchTime: ${result.getNetRuntime}-------Launch Batch processing message received! Time to run some batches..")
+      sender ! Finished(true)
+    case _ =>
+  }
+}
+
+
+class StreamingActor(streamExecutionEnvironment: StreamExecutionEnvironment) extends Actor {
+
+  def receive = {
+    case mes: LaunchStreaming =>
+      val result = streamExecutionEnvironment.execute()
+      System.err.println(s"**********result:${result.getNetRuntime}----------Streaming launch message received!")
+    case _ =>
   }
 
 }
-
-//object Main extends App {
-//  val system = ActorSystem("UnifiedBatchStream")
-//  // (3) changed this line of code
-//  val helloActor = system.actorOf(Props(new UnifiedActor()), name = "ActorExample")
-//  helloActor ! "hello"
-//  helloActor ! "buenos dias"
-//}

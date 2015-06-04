@@ -23,4 +23,8 @@ case class LaunchBatch(flag: Boolean) extends ActorMessages
 
 case class LaunchStreaming(flag: Boolean) extends ActorMessages
 
+/**
+ *
+ * @param environmentFlag : 0 -> for batch processing, and 1 -> stream processing
+ */
 case class Finished(environmentFlag: Boolean) extends ActorMessages
