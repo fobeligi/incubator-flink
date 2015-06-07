@@ -59,9 +59,7 @@ class VerticalHoeffdingTreeITSuite
         for (i <- 0 until features.size - 1) {
           featureList = featureList :+ features(i).trim.toDouble
         }
-
         LabeledVector(features(features.size - 1).trim.toDouble, DenseVector(featureList.toArray))
-
       }
     }
 
