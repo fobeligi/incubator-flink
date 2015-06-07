@@ -251,6 +251,7 @@ object Clustering {
     LabeledVector(8, DenseVector(0.5, -0.4, -0.25)),
     LabeledVector(1, DenseVector(-0.28, 0.6, -0.5)),
     LabeledVector(6, DenseVector(-0.2, -0.5, -0.2)),
-    LabeledVector(8, DenseVector(0.6, -0.4, -0.1))
+    LabeledVector(8, DenseVector(0.6, -0.4, -0.1)),
+    LabeledVector(1, DenseVector(1.46770288137823535, -2.4198470028007058, -0.1961898225195882)) //added by faye
   )
 }
