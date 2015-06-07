@@ -32,7 +32,7 @@ class OutlierITSuite
   def fixture = new {
     val env = ExecutionEnvironment.getExecutionEnvironment
     val kmeans = KMeans().setInitialCentroids(env.fromCollection(Clustering.centroidData)).
-      setNumIterations(Clustering.iterations)
+      setNumIterations(Clustering.iterations).setThreshold(0.20)
 
     val trainingDS = env.fromCollection(Clustering.trainingData)
 
@@ -50,7 +50,7 @@ class OutlierITSuite
 
     // calculate the vector to cluster mapping on the plain vectors
     val plainVectors = vectorsWithExpectedLabels.map(v => v.vector)
-    val predictedVectors = f.kmeans.predict(f.env.fromCollection(plainVectors))
+    val predictedVectors = f.kmeans.predict(f.trainingDS)
 
     predictedVectors.print()
 

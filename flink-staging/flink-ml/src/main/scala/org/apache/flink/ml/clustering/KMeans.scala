@@ -135,7 +135,7 @@ class KMeans extends Predictor[KMeans] {
    * @param threshold
    * @return itself
    */
-  def setNumIterations(threshold: Double): KMeans = {
+  def setThreshold(threshold: Double): KMeans = {
     parameters.add(Threshold, threshold)
     this
   }
@@ -150,15 +150,15 @@ object KMeans {
   val CENTROIDS = "centroids"
 
   case object NumIterations extends Parameter[Int] {
-    val defaultValue = Some(10)
+    override val defaultValue = Some(10)
   }
 
   case object InitialCentroids extends Parameter[DataSet[LabeledVector]] {
-    val defaultValue = None
+    override val defaultValue = None
   }
 
   case object Threshold extends Parameter[Double] {
-    val defaultValue = Some(0.45)
+    override val defaultValue: Option[Double] = Some(0.45)
   }
 
   // ========================================== Factory methods ====================================
@@ -180,10 +180,12 @@ object KMeans {
         input: DataSet[Vector])
       : DataSet[LabeledVector] = {
 
+        val resultingParameters = instance.parameters ++ predictParameters
+
         instance.centroids match {
           case Some(centroids) => {
 //            input.map(new SelectNearestCenterMapper).withBroadcastSet(centroids, CENTROIDS)
-            input.map(new AssignOutlierLabelMapper(predictParameters.apply(Threshold))).withBroadcastSet(centroids, CENTROIDS)
+            input.map(new AssignOutlierLabelMapper(resultingParameters.apply(Threshold))).withBroadcastSet(centroids, CENTROIDS)
           }
 
           case None => {
