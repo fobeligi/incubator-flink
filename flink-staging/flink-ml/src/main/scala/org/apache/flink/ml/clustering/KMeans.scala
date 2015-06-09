@@ -24,7 +24,7 @@ import org.apache.flink.api.scala.{DataSet, _}
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.ml.common.{LabeledVector, _}
 import org.apache.flink.ml.math.Breeze._
-import org.apache.flink.ml.math.Vector
+import org.apache.flink.ml.math.{DenseVector, Vector}
 import org.apache.flink.ml.metrics.distances.EuclideanDistanceMetric
 import org.apache.flink.ml.pipeline._
 
@@ -219,10 +219,10 @@ object KMeans {
           val newCentroids: DataSet[LabeledVector] = input
             .map(new SelectNearestCenterMapper).withBroadcastSet(currentCentroids, CENTROIDS)
             .map(x => (x.label, x.vector, 1.0)).withForwardedFields("label->_1; vector->_2")
-            .groupBy(x => x._1)
-            .reduce((p1, p2) => (p1._1, (p1._2.asBreeze + p2._2.asBreeze).fromBreeze, p1._3 +
-            p2._3))
-            .withForwardedFields("_1")
+            .groupBy(x => x._1).reduce(
+              (p1, p2) =>
+                (p1._1, (p1._2.asBreeze + p2._2.asBreeze).fromBreeze, p1._3 + p2._3)
+            ).withForwardedFields("_1")
             .map(x => LabeledVector(x._1, (x._2.asBreeze :/ x._3).fromBreeze))
             .withForwardedFields("_1->label")
 
