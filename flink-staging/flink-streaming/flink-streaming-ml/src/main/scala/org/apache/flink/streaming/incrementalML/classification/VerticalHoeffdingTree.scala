@@ -78,6 +78,11 @@ class VerticalHoeffdingTree(
     this
   }
 
+  def setModelParallelism(modelParallelism: Int): VerticalHoeffdingTree = {
+    parameters.add(ModelParallelism, modelParallelism)
+    this
+  }
+
   override def fit(input: DataStream[LabeledVector], fitParameters: ParameterMap):
   DataStream[(Int, Metrics)] = {
     val resultingParameters = this.parameters ++ fitParameters
@@ -99,28 +104,28 @@ class VerticalHoeffdingTree(
     resultingParameters: ParameterMap): (DataStream[Metrics],
     DataStream[Metrics], DataStream[(Int, Metrics)]) = {
 
-    val paral = 4
+    val modelParallelism = resultingParameters.apply(ModelParallelism)
 
     val mSAds: DataStream[(Int, Metrics)] = dataPointsStream.flatMap(new GlobalModelMapper(
-      resultingParameters)).setParallelism(paral)
+      resultingParameters)).setParallelism(modelParallelism)
 
     val attributes = mSAds.filter(new FilterFunction[(Int, Metrics)] {
       override def filter(value: (Int, Metrics)): Boolean = {
         return value._1 >= 0
       }
-    }).setParallelism(paral)
+    }).setParallelism(modelParallelism)
 
     val modelAndSignal = mSAds.filter(new FilterFunction[(Int, Metrics)] {
       override def filter(value: (Int, Metrics)): Boolean = {
         return (value._1 == -2) //metric or Signal
       }
-    }).setParallelism(paral)
+    }).setParallelism(modelParallelism)
 
     val prequentialEvaluationStream = mSAds.filter(new FilterFunction[(Int, Metrics)] {
       override def filter(value: (Int, Metrics)): Boolean = {
         return (value._1 == -3) //InstanceClassification
       }
-    }).setParallelism(paral)
+    }).setParallelism(modelParallelism)
 
     val splitDs = attributes.groupBy(0).merge(modelAndSignal.broadcast)
       .flatMap(new PartialVFDTMetricsMapper(resultingParameters)).setParallelism(
@@ -199,6 +204,13 @@ object VerticalHoeffdingTree {
    */
   case object Parallelism extends Parameter[Int] {
     override val defaultValue: Option[Int] = Some(2)
+  }
+
+  /**
+   * Specifies the number of parallel instances of the model
+   */
+  case object ModelParallelism extends Parameter[Int] {
+    override val defaultValue: Option[Int] = Some(1)
   }
 
 }
