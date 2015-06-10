@@ -19,7 +19,6 @@ package org.apache.flink.streaming.incrementalML.test.classifier
 
 import org.apache.flink.api.common.functions.FlatMapFunction
 import org.apache.flink.api.scala._
-import org.apache.flink.core.fs.FileSystem
 import org.apache.flink.ml.clustering.KMeans
 import org.apache.flink.ml.common.{LabeledVector, ParameterMap}
 import org.apache.flink.ml.math.{Vector, DenseVector}
@@ -52,17 +51,18 @@ class VerticalHoeffdingTreeITSuite
     //    VHTParameters.add(VerticalHoeffdingTree.OnlyNominalAttributes,true)
     //    VHTParameters.add(VerticalHoeffdingTree.NominalAttributes, nominalAttributes)
 
-    val dataPoints = env.readTextFile ("/Users/fobeligi/workspace/master-thesis/dataSets/" +
-      "Waveform-MOA/Waveform-2M.arrf").map {
+    val dataPoints = env.readTextFile("/Users/fobeligi/workspace/master-thesis/dataSets/" +
+      "Waveform-MOA/Waveform-2M.arrf").setParallelism(1).map {
       line => {
-        var featureList = Vector[Double]()
+        var featureList = List[Double]()
         val features = line.split(',')
         for (i <- 0 until features.size - 1) {
           featureList = featureList :+ features(i).trim.toDouble
         }
+        println(featureList)
         LabeledVector(features(features.size - 1).trim.toDouble, DenseVector(featureList.toArray))
       }
-    }
+    }.setParallelism(1)
 
     //    val transformer = Imputer()
     val vhtLearner = VerticalHoeffdingTree(env)
@@ -102,10 +102,10 @@ class UnifiedStreamBatchMapper
     val env = ExecutionEnvironment.getExecutionEnvironment
     env.setParallelism(2)
 
-    val kmeans = KMeans().setInitialCentroids(env.fromCollection(InputData.centroidData)).
-      setNumIterations(InputData.iterations).setThreshold(0.20)
+    val kmeans = KMeans().setInitialCentroids(env.fromCollection[LabeledVector](
+      InputData.centroidData)).setNumIterations(InputData.iterations).setThreshold(0.20)
 
-    val trainingDS = env.fromCollection(InputData.trainingData)
+    val trainingDS = env.fromCollection[Vector](InputData.trainingData)
 
     kmeans.fit(trainingDS)
 
