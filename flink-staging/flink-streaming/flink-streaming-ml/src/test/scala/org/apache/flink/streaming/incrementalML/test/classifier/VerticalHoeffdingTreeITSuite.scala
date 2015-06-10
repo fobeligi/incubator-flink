@@ -22,7 +22,7 @@ import org.apache.flink.api.scala._
 import org.apache.flink.ml.clustering.KMeans
 import org.apache.flink.ml.common.{LabeledVector, ParameterMap}
 import org.apache.flink.ml.math.{Vector, DenseVector}
-import org.apache.flink.streaming.api.scala._
+import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, createTypeInformation =>_}
 import org.apache.flink.streaming.incrementalML.classification.VerticalHoeffdingTree
 import org.apache.flink.streaming.incrementalML.evaluator.PrequentialEvaluator
 import org.apache.flink.streaming.incrementalML.inspector.PageHinkleyTest
@@ -102,10 +102,11 @@ class UnifiedStreamBatchMapper
     val env = ExecutionEnvironment.getExecutionEnvironment
     env.setParallelism(2)
 
-    val kmeans = KMeans().setInitialCentroids(env.fromCollection[LabeledVector](
-      InputData.centroidData)).setNumIterations(InputData.iterations).setThreshold(0.20)
+    val labelTypeInfo = createTypeInformation[Vector]
+    val kmeans = KMeans().setInitialCentroids(env.fromCollection(InputData.centroidData)).
+      setNumIterations(InputData.iterations).setThreshold(0.20)
 
-    val trainingDS = env.fromCollection[Vector](InputData.trainingData)
+    val trainingDS = env.fromCollection(InputData.trainingData)
 
     kmeans.fit(trainingDS)
 
