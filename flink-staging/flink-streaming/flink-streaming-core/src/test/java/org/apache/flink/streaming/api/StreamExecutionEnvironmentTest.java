@@ -17,23 +17,29 @@
 
 package org.apache.flink.streaming.api;
 
-import org.apache.flink.api.common.functions.FoldFunction;
-import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.functions.ReduceFunction;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.TypeExtractor;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.co.CoFlatMapFunction;
-import org.apache.flink.streaming.api.windowing.helper.Count;
+import org.apache.flink.streaming.api.functions.source.FromElementsFunction;
+import org.apache.flink.streaming.api.functions.source.FromSplittableIteratorFunction;
+import org.apache.flink.streaming.api.functions.source.SourceFunction;
+import org.apache.flink.streaming.api.functions.source.StatefulSequenceSource;
+import org.apache.flink.streaming.api.graph.StreamGraph;
+import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
+import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.util.TestStreamEnvironment;
-import org.apache.flink.util.Collector;
 import org.apache.flink.util.SplittableIterator;
 import org.junit.Test;
-
-import java.util.Iterator;
-
-import static org.junit.Assert.assertTrue;
 
 public class StreamExecutionEnvironmentTest {
 
@@ -67,25 +73,50 @@ public class StreamExecutionEnvironmentTest {
 	}
 
 	@Test
-	public void testGenerateSequenceParallelism() throws Exception {
+	public void testSources() {
 		StreamExecutionEnvironment env = new TestStreamEnvironment(PARALLELISM, MEMORYSIZE);
-		boolean seenExpectedException = false;
 
-		try {
-			DataStream<Long> dataStream1 = env.generateSequence(0,0).setParallelism(4);
-		} catch (IllegalArgumentException e) {
-			seenExpectedException = true;
-		}
+		SourceFunction<Integer> srcFun = new SourceFunction<Integer>() {
+			private static final long serialVersionUID = 1L;
 
-		DataStream<Long> dataStream2 = env.generateParallelSequence(0,0).setParallelism(4);
+			@Override
+			public void run(SourceContext<Integer> ctx) throws Exception {
+			}
 
-		String plan = env.getExecutionPlan();
+			@Override
+			public void cancel() {
+			}
+		};
+		DataStreamSource<Integer> src1 = env.addSource(srcFun);
+		assertEquals(srcFun, getFunctionFromDataSource(src1));
 
-		assertTrue("Expected Exception for setting parallelism was not thrown.", seenExpectedException);
-		assertTrue("Parallelism for dataStream1 is not right.",
-				plan.contains("\"contents\":\"Sequence Source\",\"parallelism\":1"));
-		assertTrue("Parallelism for dataStream2 is not right.",
-				plan.contains("\"contents\":\"Parallel Sequence Source\",\"parallelism\":4"));
+		List<Long> list = Arrays.asList(0L, 1L, 2L);
+
+		DataStreamSource<Long> src2 = env.generateSequence(0, 2);
+		assertTrue(getFunctionFromDataSource(src2) instanceof StatefulSequenceSource);
+
+		DataStreamSource<Long> src3 = env.fromElements(0L, 1L, 2L);
+		assertTrue(getFunctionFromDataSource(src3) instanceof FromElementsFunction);
+
+		DataStreamSource<Long> src4 = env.fromCollection(list);
+		assertTrue(getFunctionFromDataSource(src4) instanceof FromElementsFunction);
+	}
+
+	/////////////////////////////////////////////////////////////
+	// Utilities
+	/////////////////////////////////////////////////////////////
+
+
+	private static StreamOperator<?> getOperatorFromDataStream(DataStream<?> dataStream) {
+		StreamExecutionEnvironment env = dataStream.getExecutionEnvironment();
+		StreamGraph streamGraph = env.getStreamGraph();
+		return streamGraph.getStreamNode(dataStream.getId()).getOperator();
+	}
+
+	private static <T> SourceFunction<T> getFunctionFromDataSource(DataStreamSource<T> dataStreamSource) {
+		AbstractUdfStreamOperator<?, ?> operator =
+				(AbstractUdfStreamOperator<?, ?>) getOperatorFromDataStream(dataStreamSource);
+		return (SourceFunction<T>) operator.getUserFunction();
 	}
 
 	public static class DummySplittableIterator extends SplittableIterator {

@@ -19,7 +19,7 @@
 package org.apache.flink.ml.regression
 
 import org.apache.flink.api.scala.ExecutionEnvironment
-import org.apache.flink.ml.common.ParameterMap
+import org.apache.flink.ml.common.{WeightVector, ParameterMap}
 import org.apache.flink.ml.preprocessing.PolynomialFeatures
 import org.scalatest.{Matchers, FlatSpec}
 
@@ -44,7 +44,7 @@ class MultipleLinearRegressionITSuite
 
     val parameters = ParameterMap()
 
-    parameters.add(MultipleLinearRegression.Stepsize, 1.0)
+    parameters.add(MultipleLinearRegression.Stepsize, 2.0)
     parameters.add(MultipleLinearRegression.Iterations, 10)
     parameters.add(MultipleLinearRegression.ConvergenceThreshold, 0.001)
 
@@ -55,13 +55,13 @@ class MultipleLinearRegressionITSuite
 
     weightList.size should equal(1)
 
-    val (weights, weight0) = weightList(0)
+    val WeightVector(weights, intercept) = weightList(0)
 
-    expectedWeights zip weights foreach {
+    expectedWeights.toIterator zip weights.valueIterator foreach {
       case (expectedWeight, weight) =>
         weight should be (expectedWeight +- 1)
     }
-    weight0 should be (expectedWeight0 +- 0.4)
+    intercept should be (expectedWeight0 +- 0.4)
 
     val srs = mlr.squaredResidualSum(inputDS).collect().apply(0)
 
@@ -82,7 +82,7 @@ class MultipleLinearRegressionITSuite
 
     val parameters = ParameterMap()
       .add(PolynomialFeatures.Degree, 3)
-      .add(MultipleLinearRegression.Stepsize, 0.002)
+      .add(MultipleLinearRegression.Stepsize, 0.004)
       .add(MultipleLinearRegression.Iterations, 100)
 
     pipeline.fit(inputDS, parameters)
@@ -91,19 +91,43 @@ class MultipleLinearRegressionITSuite
 
     weightList.size should equal(1)
 
-    val (weights, weight0) = weightList(0)
+    val WeightVector(weights, intercept) = weightList(0)
 
-    RegressionData.expectedPolynomialWeights.zip(weights) foreach {
+    RegressionData.expectedPolynomialWeights.toIterator.zip(weights.valueIterator) foreach {
       case (expectedWeight, weight) =>
         weight should be(expectedWeight +- 0.1)
     }
 
-    weight0 should be(RegressionData.expectedPolynomialWeight0 +- 0.1)
+    intercept should be(RegressionData.expectedPolynomialWeight0 +- 0.1)
 
     val transformedInput = polynomialBase.transform(inputDS, parameters)
 
     val srs = mlr.squaredResidualSum(transformedInput).collect().apply(0)
 
     srs should be(RegressionData.expectedPolynomialSquaredResidualSum +- 5)
+  }
+
+  it should "make (mostly) correct predictions" in {
+    val env = ExecutionEnvironment.getExecutionEnvironment
+
+    val mlr = MultipleLinearRegression()
+
+    import RegressionData._
+
+    val parameters = ParameterMap()
+
+    parameters.add(MultipleLinearRegression.Stepsize, 1.0)
+    parameters.add(MultipleLinearRegression.Iterations, 10)
+    parameters.add(MultipleLinearRegression.ConvergenceThreshold, 0.001)
+
+    val inputDS = env.fromCollection(data)
+    mlr.fit(inputDS, parameters)
+
+    val predictionPairs = mlr.predict(inputDS)
+
+    val absoluteErrorSum = predictionPairs.collect().map{
+      case (truth, prediction) => Math.abs(truth - prediction)}.sum
+
+    absoluteErrorSum should be < 50.0
   }
 }

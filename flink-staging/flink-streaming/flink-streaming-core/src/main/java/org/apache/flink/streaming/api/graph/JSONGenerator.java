@@ -73,7 +73,7 @@ public class JSONGenerator {
 				node.put(PREDECESSORS, inputs);
 
 				for (StreamEdge inEdge : vertex.getInEdges()) {
-					int inputID = inEdge.getSourceID();
+					int inputID = inEdge.getSourceId();
 
 					Integer mappedID = (edgeRemapings.keySet().contains(inputID)) ? edgeRemapings
 							.get(inputID) : inputID;
@@ -85,7 +85,7 @@ public class JSONGenerator {
 		} else {
 			Integer iterationHead = -1;
 			for (StreamEdge inEdge : vertex.getInEdges()) {
-				int operator = inEdge.getSourceID();
+				int operator = inEdge.getSourceId();
 
 				if (streamGraph.vertexIDtoLoop.containsKey(operator)) {
 					iterationHead = operator;
@@ -127,7 +127,7 @@ public class JSONGenerator {
 			obj.put(PREDECESSORS, inEdges);
 
 			for (StreamEdge inEdge : vertex.getInEdges()) {
-				int inputID = inEdge.getSourceID();
+				int inputID = inEdge.getSourceId();
 
 				if (edgeRemapings.keySet().contains(inputID)) {
 					decorateEdge(inEdges, vertexID, inputID, inputID);
@@ -147,7 +147,7 @@ public class JSONGenerator {
 		JSONObject input = new JSONObject();
 		inputArray.put(input);
 		input.put(ID, mappedInputID);
-		input.put(SHIP_STRATEGY, streamGraph.getEdge(inputID, vertexID).getPartitioner()
+		input.put(SHIP_STRATEGY, streamGraph.getStreamEdge(inputID, vertexID).getPartitioner()
 				.getStrategy());
 		input.put(SIDE, (inputArray.length() == 0) ? "first" : "second");
 	}

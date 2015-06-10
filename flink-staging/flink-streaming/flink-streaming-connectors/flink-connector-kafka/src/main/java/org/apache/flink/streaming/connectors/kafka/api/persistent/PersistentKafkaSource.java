@@ -30,6 +30,7 @@ import kafka.utils.ZkUtils;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.exception.ZkMarshallingError;
 import org.I0Itec.zkclient.serialize.ZkSerializer;
+import org.apache.commons.collections.map.LinkedMap;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.configuration.Configuration;
@@ -50,7 +51,6 @@ import java.io.ObjectOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -65,23 +65,28 @@ public class PersistentKafkaSource<OUT> extends RichParallelSourceFunction<OUT> 
 		ResultTypeQueryable<OUT>,
 		CheckpointCommitter,
 		CheckpointedAsynchronously<long[]> {
+
+	private static final long serialVersionUID = 287845877188312621L;
+	
 	private static final Logger LOG = LoggerFactory.getLogger(PersistentKafkaSource.class);
 
-	protected transient ConsumerConfig consumerConfig;
+	
+	private final String topicName;
+	private final DeserializationSchema<OUT> deserializationSchema;
+
+	private final LinkedMap pendingCheckpoints = new LinkedMap();
+	
+	private transient ConsumerConfig consumerConfig;
 	private transient ConsumerIterator<byte[], byte[]> iteratorToRead;
 	private transient ConsumerConnector consumer;
-
-	private String topicName;
-	private DeserializationSchema<OUT> deserializationSchema;
-	private boolean running = true;
-
-	private transient long[] lastOffsets;
+	
 	private transient ZkClient zkClient;
+	private transient long[] lastOffsets;
 	private transient long[] commitedOffsets; // maintain committed offsets, to avoid committing the same over and over again.
-
-	// We set this in reachedEnd to carry it over to next()
-	private OUT nextElement = null;
-
+	private transient long[] restoreState;
+	
+	private volatile boolean running;
+	
 	/**
 	 *
 	 * For the @param consumerConfig, specify at least the "groupid" and "zookeeper.connect" string.
@@ -96,12 +101,12 @@ public class PersistentKafkaSource<OUT> extends RichParallelSourceFunction<OUT> 
 		this.topicName = topicName;
 		this.deserializationSchema = deserializationSchema;
 		this.consumerConfig = consumerConfig;
-		if(consumerConfig.autoCommitEnable()) {
+		if (consumerConfig.autoCommitEnable()) {
 			throw new IllegalArgumentException("'auto.commit.enable' is set to 'true'. " +
 					"This source can only be used with auto commit disabled because the " +
 					"source is committing to zookeeper by itself (not using the KafkaConsumer).");
 		}
-		if(!consumerConfig.offsetsStorage().equals("zookeeper")) {
+		if (!consumerConfig.offsetsStorage().equals("zookeeper")) {
 			// we can currently only commit to ZK.
 			throw new IllegalArgumentException("The 'offsets.storage' has to be set to 'zookeeper' for this Source to work reliably");
 		}
@@ -133,60 +138,71 @@ public class PersistentKafkaSource<OUT> extends RichParallelSourceFunction<OUT> 
 		this.consumer = consumer;
 
 		zkClient = new ZkClient(consumerConfig.zkConnect(),
-			consumerConfig.zkSessionTimeoutMs(),
-			consumerConfig.zkConnectionTimeoutMs(),
-			new KafkaZKStringSerializer());
+				consumerConfig.zkSessionTimeoutMs(),
+				consumerConfig.zkConnectionTimeoutMs(),
+				new KafkaZKStringSerializer());
 
 		// most likely the number of offsets we're going to store here will be lower than the number of partitions.
 		int numPartitions = getNumberOfPartitions();
 		LOG.debug("The topic {} has {} partitions", topicName, numPartitions);
 		this.lastOffsets = new long[numPartitions];
 		this.commitedOffsets = new long[numPartitions];
-		Arrays.fill(this.lastOffsets, -1);
-		Arrays.fill(this.commitedOffsets, 0); // just to make it clear
+		// check if there are offsets to restore
+		if (restoreState != null) {
+			if (restoreState.length != numPartitions) {
+				throw new IllegalStateException("There are "+restoreState.length+" offsets to restore for topic "+topicName+" but " +
+						"there are only "+numPartitions+" in the topic");
+			}
 
-		nextElement = null;
+			LOG.info("Setting restored offsets {} in ZooKeeper", Arrays.toString(restoreState));
+			setOffsetsInZooKeeper(restoreState);
+			this.lastOffsets = restoreState;
+		} else {
+			// initialize empty offsets
+			Arrays.fill(this.lastOffsets, -1);
+		}
+		Arrays.fill(this.commitedOffsets, 0); // just to make it clear
+		
+		pendingCheckpoints.clear();
+		running = true;
 	}
 
 	@Override
-	public boolean reachedEnd() throws Exception {
-		if (nextElement != null) {
-			return false;
+	public void run(SourceContext<OUT> ctx) throws Exception {
+		if (iteratorToRead == null) {
+			throw new IllegalStateException("Kafka iterator not initialized properly.");
 		}
 
-		while (iteratorToRead.hasNext()) {
+		final Object checkpointLock = ctx.getCheckpointLock();
+		
+		while (running && iteratorToRead.hasNext()) {
 			MessageAndMetadata<byte[], byte[]> message = iteratorToRead.next();
 			if(lastOffsets[message.partition()] >= message.offset()) {
 				LOG.info("Skipping message with offset {} from partition {}", message.offset(), message.partition());
 				continue;
 			}
-			lastOffsets[message.partition()] = message.offset();
+			OUT next = deserializationSchema.deserialize(message.message());
 
-			OUT out = deserializationSchema.deserialize(message.message());
-			if (deserializationSchema.isEndOfStream(out)) {
+			if (deserializationSchema.isEndOfStream(next)) {
 				LOG.info("DeserializationSchema signaled end of stream for this source");
 				break;
 			}
 
-			nextElement = out;
+			// make the state update and the element emission atomic
+			synchronized (checkpointLock) {
+				lastOffsets[message.partition()] = message.offset();
+				ctx.collect(next);
+			}
+
 			if (LOG.isTraceEnabled()) {
 				LOG.trace("Processed record with offset {} from partition {}", message.offset(), message.partition());
 			}
-			break;
 		}
-
-		return nextElement == null;
 	}
 
 	@Override
-	public OUT next() throws Exception {
-		if (!reachedEnd()) {
-			OUT result = nextElement;
-			nextElement = null;
-			return result;
-		} else {
-			throw new RuntimeException("Source exhausted");
-		}
+	public void cancel() {
+		running = false;
 	}
 
 	@Override
@@ -200,27 +216,34 @@ public class PersistentKafkaSource<OUT> extends RichParallelSourceFunction<OUT> 
 	// ---------------------- State / Checkpoint handling  -----------------
 	// this source is keeping the partition offsets in Zookeeper
 
-	private Map<Long, long[]> pendingCheckpoints = new HashMap<Long, long[]>();
-
 	@Override
 	public long[] snapshotState(long checkpointId, long checkpointTimestamp) throws Exception {
-		if(lastOffsets == null) {
+		if (lastOffsets == null) {
 			LOG.warn("State snapshot requested on not yet opened source. Returning null");
 			return null;
 		}
-		LOG.info("Snapshotting state. Offsets: {}, checkpoint id {}, timestamp {}", Arrays.toString(lastOffsets), checkpointId, checkpointTimestamp);
+		
+		if (LOG.isInfoEnabled()) {
+			LOG.info("Snapshotting state. Offsets: {}, checkpoint id {}, timestamp {}",
+					Arrays.toString(lastOffsets), checkpointId, checkpointTimestamp);
+		}
 
 		long[] currentOffsets = Arrays.copyOf(lastOffsets, lastOffsets.length);
-		pendingCheckpoints.put(checkpointId, currentOffsets);
+		
+		// the map may be asynchronously updates when committing to Kafka, so we synchronize
+		synchronized (pendingCheckpoints) {
+			pendingCheckpoints.put(checkpointId, currentOffsets);
+		}
+		
 		return currentOffsets;
 	}
 
 	@Override
 	public void restoreState(long[] state) {
-		// we maintain the offsets in Kafka, so nothing to do.
+		LOG.info("The state will be restored to {} in the open() method", Arrays.toString(state));
+		this.restoreState = Arrays.copyOf(state, state.length);
 	}
-
-
+	
 	/**
 	 * Notification on completed checkpoints
 	 * @param checkpointId The ID of the checkpoint that has been completed.
@@ -228,15 +251,36 @@ public class PersistentKafkaSource<OUT> extends RichParallelSourceFunction<OUT> 
 	@Override
 	public void commitCheckpoint(long checkpointId) {
 		LOG.info("Commit checkpoint {}", checkpointId);
-		long[] checkpointOffsets = pendingCheckpoints.remove(checkpointId);
-		if(checkpointOffsets == null) {
-			LOG.warn("Unable to find pending checkpoint for id {}", checkpointId);
-			return;
-		}
-		LOG.info("Got corresponding offsets {}", Arrays.toString(checkpointOffsets));
 
-		for(int partition = 0; partition < checkpointOffsets.length; partition++) {
-			long offset = checkpointOffsets[partition];
+		long[] checkpointOffsets;
+		
+		// the map may be asynchronously updates when snapshotting state, so we synchronize
+		synchronized (pendingCheckpoints) {
+			final int posInMap = pendingCheckpoints.indexOf(checkpointId);
+			if (posInMap == -1) {
+				LOG.warn("Unable to find pending checkpoint for id {}", checkpointId);
+				return;
+			}
+	
+			checkpointOffsets = (long[]) pendingCheckpoints.remove(posInMap);
+			// remove older checkpoints in map:
+			if (!pendingCheckpoints.isEmpty()) {
+				for(int i = 0; i < posInMap; i++) {
+					pendingCheckpoints.remove(0);
+				}
+			} 
+		}
+
+		if (LOG.isInfoEnabled()) {
+			LOG.info("Committing offsets {} to ZooKeeper", Arrays.toString(checkpointOffsets));
+		}
+
+		setOffsetsInZooKeeper(checkpointOffsets);
+	}
+
+	private void setOffsetsInZooKeeper(long[] offsets) {
+		for (int partition = 0; partition < offsets.length; partition++) {
+			long offset = offsets[partition];
 			if(offset != -1) {
 				setOffset(partition, offset);
 			}

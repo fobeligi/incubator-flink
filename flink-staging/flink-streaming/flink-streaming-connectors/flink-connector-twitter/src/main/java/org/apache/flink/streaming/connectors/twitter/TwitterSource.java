@@ -22,17 +22,16 @@ import java.io.InputStream;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
+import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.twitter.hbc.ClientBuilder;
 import com.twitter.hbc.core.Constants;
+import com.twitter.hbc.core.endpoint.DefaultStreamingEndpoint;
 import com.twitter.hbc.core.endpoint.StatusesSampleEndpoint;
 import com.twitter.hbc.core.processor.StringDelimitedProcessor;
 import com.twitter.hbc.httpclient.BasicClient;
@@ -41,25 +40,24 @@ import com.twitter.hbc.httpclient.auth.OAuth1;
 
 /**
  * Implementation of {@link SourceFunction} specialized to emit tweets from
- * Twitter. It can connect to Twitter Streaming API, collect tweets and
+ * Twitter. This is not a parallel source because the Twitter API only allows
+ * two concurrent connections.
  */
-public class TwitterSource extends RichParallelSourceFunction<String> {
+public class TwitterSource extends RichSourceFunction<String> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(TwitterSource.class);
 
 	private static final long serialVersionUID = 1L;
 	private String authPath;
-	private transient BlockingQueue<String> queue;
-	private int queueSize = 10000;
+	protected transient BlockingQueue<String> queue;
+	protected int queueSize = 10000;
 	private transient BasicClient client;
 	private int waitSec = 5;
 
 	private int maxNumberOfTweets;
 	private int currentNumberOfTweets;
 
-	private String nextElement = null;
-
-	private volatile boolean isRunning = false;
+	private transient volatile boolean isRunning;
 
 	/**
 	 * Create {@link TwitterSource} for streaming
@@ -91,12 +89,13 @@ public class TwitterSource extends RichParallelSourceFunction<String> {
 	public void open(Configuration parameters) throws Exception {
 		initializeConnection();
 		currentNumberOfTweets = 0;
+		isRunning = true;
 	}
 
 	/**
 	 * Initialize Hosebird Client to be able to consume Twitter's Streaming API
 	 */
-	private void initializeConnection() {
+	protected void initializeConnection() {
 
 		if (LOG.isInfoEnabled()) {
 			LOG.info("Initializing Twitter Streaming API connection");
@@ -116,10 +115,10 @@ public class TwitterSource extends RichParallelSourceFunction<String> {
 		}
 	}
 
-	private OAuth1 authenticate() {
+	protected OAuth1 authenticate() {
 
 		Properties authenticationProperties = loadAuthenticationProperties();
-
+		
 		return new OAuth1(authenticationProperties.getProperty("consumerKey"),
 				authenticationProperties.getProperty("consumerSecret"),
 				authenticationProperties.getProperty("token"),
@@ -132,6 +131,7 @@ public class TwitterSource extends RichParallelSourceFunction<String> {
 	 * @return the authentication data.
 	 */
 	private Properties loadAuthenticationProperties() {
+		
 		Properties properties = new Properties();
 		try {
 			InputStream input = new FileInputStream(authPath);
@@ -143,89 +143,25 @@ public class TwitterSource extends RichParallelSourceFunction<String> {
 		return properties;
 	}
 
-	private void initializeClient(StatusesSampleEndpoint endpoint, Authentication auth) {
+	protected void initializeClient(DefaultStreamingEndpoint endpoint, Authentication auth) {
 
 		client = new ClientBuilder().name("twitterSourceClient").hosts(Constants.STREAM_HOST)
 				.endpoint(endpoint).authentication(auth)
 				.processor(new StringDelimitedProcessor(queue)).build();
-
+		
 		client.connect();
 	}
 
-	/**
-	 * Put tweets into output
-	 * 
-	 * @param collector
-	 *            Collector in which the tweets are collected.
-	 */
-	protected void collectFiniteMessages(Collector<String> collector) {
-
-		if (LOG.isInfoEnabled()) {
-			LOG.info("Collecting tweets");
-		}
-
-		for (int i = 0; i < maxNumberOfTweets; i++) {
-			collectOneMessage(collector);
-		}
-
-		if (LOG.isInfoEnabled()) {
-			LOG.info("Collecting tweets finished");
-		}
-	}
-
-	/**
-	 * Put tweets into output
-	 * 
-	 * @param collector
-	 *            Collector in which the tweets are collected.
-	 */
-	protected void collectMessages(Collector<String> collector) {
-
-		if (LOG.isInfoEnabled()) {
-			LOG.info("Tweet-stream begins");
-		}
-
-		while (isRunning) {
-			collectOneMessage(collector);
-		}
-	}
-
-	/**
-	 * Put one tweet into the output.
-	 * 
-	 * @param collector
-	 *            Collector in which the tweets are collected.
-	 */
-	protected void collectOneMessage(Collector<String> collector) {
-		if (client.isDone()) {
-			if (LOG.isErrorEnabled()) {
-				LOG.error("Client connection closed unexpectedly: {}", client.getExitEvent()
-						.getMessage());
-			}
-		}
-
-		try {
-			String msg = queue.poll(waitSec, TimeUnit.SECONDS);
-			if (msg != null) {
-				collector.collect(msg);
-			} else {
-				if (LOG.isInfoEnabled()) {
-					LOG.info("Did not receive a message in {} seconds", waitSec);
-				}
-			}
-		} catch (InterruptedException e) {
-			throw new RuntimeException("'Waiting for tweet' thread is interrupted", e);
-		}
-
-	}
-
-	private void closeConnection() {
+	@Override
+	public void close() {
 
 		if (LOG.isInfoEnabled()) {
 			LOG.info("Initiating connection close");
 		}
 
-		client.stop();
+		if (client != null) {
+			client.stop();
+		}
 
 		if (LOG.isInfoEnabled()) {
 			LOG.info("Connection closed successfully");
@@ -272,51 +208,26 @@ public class TwitterSource extends RichParallelSourceFunction<String> {
 	}
 
 	@Override
-	public boolean reachedEnd() throws Exception {
-		if (currentNumberOfTweets >= maxNumberOfTweets) {
-			return false;
-		}
-
-		if (nextElement != null) {
-			return true;
-		}
-		if (client.isDone()) {
-			if (LOG.isErrorEnabled()) {
-				LOG.error("Client connection closed unexpectedly: {}", client.getExitEvent()
-						.getMessage());
-			}
-			return false;
-		}
-
-		try {
-			String msg = queue.poll(waitSec, TimeUnit.SECONDS);
-			if (msg != null) {
-				nextElement = msg;
-				return true;
-			} else {
-				if (LOG.isInfoEnabled()) {
-					LOG.info("Did not receive a message in {} seconds", waitSec);
+	public void run(SourceContext<String> ctx) throws Exception {
+		while (isRunning) {
+			if (client.isDone()) {
+				if (LOG.isErrorEnabled()) {
+					LOG.error("Client connection closed unexpectedly: {}", client.getExitEvent()
+							.getMessage());
 				}
+				break;
 			}
-		} catch (InterruptedException e) {
-			throw new RuntimeException("'Waiting for tweet' thread is interrupted", e);
+
+			ctx.collect(queue.take());
+
+			if (maxNumberOfTweets != -1 && currentNumberOfTweets >= maxNumberOfTweets) {
+				break;
+			}
 		}
-		return false;
 	}
 
 	@Override
-	public String next() throws Exception {
-		if (nextElement != null) {
-			String result = nextElement;
-			nextElement = null;
-			return result;
-		}
-		if (reachedEnd()) {
-			throw new RuntimeException("Twitter stream end reached.");
-		} else {
-			String result = nextElement;
-			nextElement = null;
-			return result;
-		}
+	public void cancel() {
+		isRunning = false;
 	}
 }

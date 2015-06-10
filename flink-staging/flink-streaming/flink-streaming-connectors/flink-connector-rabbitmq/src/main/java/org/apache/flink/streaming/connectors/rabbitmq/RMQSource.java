@@ -22,8 +22,6 @@ import java.io.IOException;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.source.ConnectorSource;
 import org.apache.flink.streaming.util.serialization.DeserializationSchema;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
@@ -32,8 +30,6 @@ import com.rabbitmq.client.QueueingConsumer;
 
 public class RMQSource<OUT> extends ConnectorSource<OUT> {
 	private static final long serialVersionUID = 1L;
-
-	private static final Logger LOG = LoggerFactory.getLogger(RMQSource.class);
 
 	private final String QUEUE_NAME;
 	private final String HOST_NAME;
@@ -44,9 +40,7 @@ public class RMQSource<OUT> extends ConnectorSource<OUT> {
 	private transient QueueingConsumer consumer;
 	private transient QueueingConsumer.Delivery delivery;
 
-	private volatile boolean isRunning = false;
-
-	OUT out;
+	private transient volatile boolean running;
 
 	public RMQSource(String HOST_NAME, String QUEUE_NAME,
 			DeserializationSchema<OUT> deserializationSchema) {
@@ -76,6 +70,7 @@ public class RMQSource<OUT> extends ConnectorSource<OUT> {
 	@Override
 	public void open(Configuration config) throws Exception {
 		initializeConnection();
+		running = true;
 	}
 
 	@Override
@@ -90,49 +85,21 @@ public class RMQSource<OUT> extends ConnectorSource<OUT> {
 	}
 
 	@Override
-	public boolean reachedEnd() throws Exception {
-		if (out != null) {
-			return true;
-		}
-		try {
+	public void run(SourceContext<OUT> ctx) throws Exception {
+		while (running) {
 			delivery = consumer.nextDelivery();
-		} catch (Exception e) {
-			if (LOG.isErrorEnabled()) {
-				LOG.error("Cannot recieve RMQ message {} at {}", QUEUE_NAME, HOST_NAME);
-			}
-		}
 
-		out = schema.deserialize(delivery.getBody());
-		if (schema.isEndOfStream(out)) {
-			out = null;
-			return false;
+			OUT result = schema.deserialize(delivery.getBody());
+			if (schema.isEndOfStream(result)) {
+				break;
+			}
+
+			ctx.collect(result);
 		}
-		return true;
 	}
 
 	@Override
-	public OUT next() throws Exception {
-		if (out != null) {
-			OUT result = out;
-			out = null;
-			return result;
-		}
-
-		try {
-			delivery = consumer.nextDelivery();
-		} catch (Exception e) {
-			if (LOG.isErrorEnabled()) {
-				LOG.error("Cannot recieve RMQ message {} at {}", QUEUE_NAME, HOST_NAME);
-			}
-		}
-
-		out = schema.deserialize(delivery.getBody());
-		if (schema.isEndOfStream(out)) {
-			throw new RuntimeException("RMQ source is at end.");
-		}
-		OUT result = out;
-		out = null;
-		return result;
+	public void cancel() {
+		running = false;
 	}
-
 }

@@ -44,7 +44,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamSource;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
-import org.apache.flink.streaming.runtime.partitioner.DistributePartitioner;
+import org.apache.flink.streaming.runtime.partitioner.RebalancePartitioner;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecordSerializer;
 import org.apache.flink.streaming.runtime.tasks.OneInputStreamTask;
@@ -205,7 +205,7 @@ public class StreamGraph extends StreamingPlan {
 		itSource.setParallelism(getStreamNode(iterationHead).getParallelism());
 		
 
-		addEdge(sourceID, iterationHead, new DistributePartitioner(true), 0, new ArrayList<String>());
+		addEdge(sourceID, iterationHead, new RebalancePartitioner(true), 0, new ArrayList<String>());
 
 		if (LOG.isDebugEnabled()) {
 			LOG.debug("ITERATION SOURCE: {}", sourceID);
@@ -232,8 +232,7 @@ public class StreamGraph extends StreamingPlan {
 		setSerializersFrom(iterationTail, sinkID);
 		getStreamNode(sinkID).setOperatorName("IterationSink-" + sinkID);
 
-		setBufferTimeout(iteration.getSource().getID(), getStreamNode(iterationTail)
-				.getBufferTimeout());
+		setBufferTimeout(iteration.getSource().getId(), getStreamNode(iterationTail).getBufferTimeout());
 
 		if (LOG.isDebugEnabled()) {
 			LOG.debug("ITERATION SINK: {}", sinkID);
@@ -257,8 +256,8 @@ public class StreamGraph extends StreamingPlan {
 
 		StreamEdge edge = new StreamEdge(getStreamNode(upStreamVertexID),
 				getStreamNode(downStreamVertexID), typeNumber, outputNames, partitionerObject);
-		getStreamNode(edge.getSourceID()).addOutEdge(edge);
-		getStreamNode(edge.getTargetID()).addInEdge(edge);
+		getStreamNode(edge.getSourceId()).addOutEdge(edge);
+		getStreamNode(edge.getTargetId()).addInEdge(edge);
 	}
 
 	public <T> void addOutputSelector(Integer vertexID, OutputSelector<T> outputSelector) {
@@ -330,12 +329,12 @@ public class StreamGraph extends StreamingPlan {
 		return streamNodes.keySet();
 	}
 
-	protected StreamEdge getEdge(int sourceId, int targetId) {
+	public StreamEdge getStreamEdge(int sourceId, int targetId) {
 		Iterator<StreamEdge> outIterator = getStreamNode(sourceId).getOutEdges().iterator();
 		while (outIterator.hasNext()) {
 			StreamEdge edge = outIterator.next();
 
-			if (edge.getTargetID() == targetId) {
+			if (edge.getTargetId() == targetId) {
 				return edge;
 			}
 		}
@@ -354,7 +353,7 @@ public class StreamGraph extends StreamingPlan {
 	public Set<Tuple2<Integer, StreamOperator<?>>> getOperators() {
 		Set<Tuple2<Integer, StreamOperator<?>>> operatorSet = new HashSet<Tuple2<Integer, StreamOperator<?>>>();
 		for (StreamNode vertex : streamNodes.values()) {
-			operatorSet.add(new Tuple2<Integer, StreamOperator<?>>(vertex.getID(), vertex
+			operatorSet.add(new Tuple2<Integer, StreamOperator<?>>(vertex.getId(), vertex
 					.getOperator()));
 		}
 		return operatorSet;
@@ -389,7 +388,7 @@ public class StreamGraph extends StreamingPlan {
 		for (StreamEdge edge : edgesToRemove) {
 			removeEdge(edge);
 		}
-		streamNodes.remove(toRemove.getID());
+		streamNodes.remove(toRemove.getId());
 	}
 
 	/**
@@ -462,7 +461,7 @@ public class StreamGraph extends StreamingPlan {
 	 * Object for representing loops in streaming programs.
 	 * 
 	 */
-	protected static class StreamLoop {
+	public static class StreamLoop {
 
 		private Integer loopID;
 

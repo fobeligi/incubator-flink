@@ -53,7 +53,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -115,8 +114,7 @@ public class ComplexIntegrationTest extends StreamingMultipleProgramsTestBase {
 		//i == 18
 		expected2 += "(20,(a,1))";
 
-		//We create a separate environment for this test because of the slot-related to iteration issues.
-		StreamExecutionEnvironment env = new TestStreamEnvironment(4, 32); //StreamExecutionEnvironment.getExecutionEnvironment();
+		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		DataStream<Tuple2<Long, Tuple2<String, Long>>> sourceStream1 = env.addSource(new TupleSource()).setParallelism(1);
 
 		IterativeDataStream<Tuple2<Long, Tuple2<String, Long>>> it = sourceStream1.sum(0).setParallelism(1).filter(new FilterFunction
@@ -209,6 +207,11 @@ public class ComplexIntegrationTest extends StreamingMultipleProgramsTestBase {
 				"16937\n" + "11927\n" + "9973\n" + "14431\n" + "19507\n" + "12497\n" + "17497\n" + "14983\n" +
 				"19997\n";
 
+		expected1 = "541\n" + "1223\n" + "1987\n" + "2741\n" + "3571\n" + "10939\n" + "4409\n" +
+				"5279\n" + "11927\n" + "6133\n" + "6997\n" + "12823\n" + "7919\n" + "8831\n" +
+				"13763\n" + "9733\n" + "9973\n" + "14759\n" + "15671\n" + "16673\n" + "17659\n" +
+				"18617\n" + "19697\n" + "19997\n";
+
 		for (int i = 2; i < 100; i++) {
 			expected2 += "(" + i + "," + 20000 / i + ")\n";
 		}
@@ -219,22 +222,26 @@ public class ComplexIntegrationTest extends StreamingMultipleProgramsTestBase {
 		expected2 += "(" + 20000 + "," + 1 + ")";
 
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-		
+
+		// set to parallelism 1 because otherwise we don't know which elements go to which parallel
+		// count-window.
+		env.setParallelism(1);
+
 		env.setBufferTimeout(0);
 
-		DataStream<Long> sourceStream31 = env.generateParallelSequence(1, 10000);
-		DataStream<Long> sourceStream32 = env.generateParallelSequence(10001, 20000);
+		DataStream<Long> sourceStream31 = env.generateSequence(1, 10000);
+		DataStream<Long> sourceStream32 = env.generateSequence(10001, 20000);
 
 		sourceStream31.filter(new PrimeFilterFunction())
 				.window(Count.of(100))
 				.max(0).flatten()
-				.merge(sourceStream32.filter(new PrimeFilterFunction())
+				.union(sourceStream32.filter(new PrimeFilterFunction())
 						.window(Count.of(100))
 						.max(0).flatten())
 				.writeAsText(resultPath1, FileSystem.WriteMode.OVERWRITE);
 
 		sourceStream31.flatMap(new DivisorsFlatMapFunction())
-				.merge(sourceStream32.flatMap(new DivisorsFlatMapFunction())).map(new MapFunction<Long, Tuple2<Long,
+				.union(sourceStream32.flatMap(new DivisorsFlatMapFunction())).map(new MapFunction<Long, Tuple2<Long,
 				Integer>>() {
 
 			@Override
@@ -276,7 +283,7 @@ public class ComplexIntegrationTest extends StreamingMultipleProgramsTestBase {
 		env.addSource(new RectangleSource())
 				.global()
 				.map(new RectangleMapFunction())
-				.window(Delta.of(0.0, new MyDelta(), new Tuple2<RectangleClass, Integer>(new RectangleClass(100, 100), 0)))
+				.window(Delta.of(0.0, new MyDelta(), new Tuple2<Rectangle, Integer>(new Rectangle(100, 100), 0)))
 				.mapWindow(new MyWindowMapFunction())
 				.flatten()
 				.writeAsText(resultPath1, FileSystem.WriteMode.OVERWRITE);
@@ -284,11 +291,11 @@ public class ComplexIntegrationTest extends StreamingMultipleProgramsTestBase {
 		env.execute();
 	}
 
-	private static class MyDelta implements DeltaFunction<Tuple2<RectangleClass, Integer>> {
+	private static class MyDelta implements DeltaFunction<Tuple2<Rectangle, Integer>> {
 		private static final long serialVersionUID = 1L;
 
 		@Override
-		public double getDelta(Tuple2<RectangleClass, Integer> oldDataPoint, Tuple2<RectangleClass,
+		public double getDelta(Tuple2<Rectangle, Integer> oldDataPoint, Tuple2<Rectangle,
 				Integer> newDataPoint) {
 			return (newDataPoint.f0.b - newDataPoint.f0.a) - (oldDataPoint.f0.b - oldDataPoint.f0.a);
 		}
@@ -301,14 +308,18 @@ public class ComplexIntegrationTest extends StreamingMultipleProgramsTestBase {
 		//Turning on and off chaining
 
 		expected1 = "1\n" + "2\n" + "2\n" + "3\n" + "3\n" + "3\n" + "4\n" + "4\n" + "4\n" + "4\n" + "5\n" + "5\n" +
-				"5\n" + "5\n" + "5\n" + "1\n" + "3\n" + "3\n" + "4\n" + "5\n" + "5\n" + "6\n" + "8\n" + "9\n" + "10\n" +
-				"12\n" + "15\n" + "16\n" + "20\n" + "25\n";
+				"5\n" + "5\n" + "5\n" + "1\n" + "3\n" + "5\n" + "8\n" + "11\n" + "14\n" + "18\n" + "22\n" + "26\n" +
+				"30\n" + "35\n" + "40\n" + "45\n" + "50\n" + "55\n";
 
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
+		// Set to parallelism 1 to make it deterministic, otherwise, it is not clear which
+		// elements will go to which parallel instance of the fold
+		env.setParallelism(1);
 		
 		env.setBufferTimeout(0);
 
-		DataStream<Long> dataStream51 = env.generateParallelSequence(1, 5)
+		DataStream<Long> dataStream51 = env.generateSequence(1, 5)
 				.map(new MapFunction<Long, Long>() {
 
 					@Override
@@ -348,7 +359,9 @@ public class ComplexIntegrationTest extends StreamingMultipleProgramsTestBase {
 		});
 
 
-		dataStream53.merge(dataStream52)
+		dataStream53.union(dataStream52).print();
+
+		dataStream53.union(dataStream52)
 				.writeAsText(resultPath1, FileSystem.WriteMode.OVERWRITE);
 
 		env.execute();
@@ -485,33 +498,33 @@ public class ComplexIntegrationTest extends StreamingMultipleProgramsTestBase {
 		long cnt = 0;
 
 		@Override
-		public boolean reachedEnd() throws Exception {
-			return cnt >= 20;
+		public void run(SourceContext<OuterPojo> ctx) throws Exception {
+			for (int i = 0; i < 20; i++) {
+				OuterPojo result = new OuterPojo(new InnerPojo(cnt / 2, "water_melon-b"), 2L);
+				ctx.collect(result);
+			}
 		}
 
 		@Override
-		public OuterPojo next() throws Exception {
-			OuterPojo result = new OuterPojo(new InnerPojo(cnt / 2, "water_melon-b"), 2L);
-			cnt++;
-			return result;
+		public void cancel() {
+
 		}
 	}
 
 	private static class TupleSource implements SourceFunction<Tuple2<Long, Tuple2<String, Long>>> {
 		private static final long serialVersionUID = 1L;
 
-		int cnt = 0;
-
 		@Override
-		public boolean reachedEnd() throws Exception {
-			return cnt >= 20;
+		public void run(SourceContext<Tuple2<Long, Tuple2<String, Long>>> ctx) throws Exception {
+			for (int i = 0; i < 20; i++) {
+				Tuple2<Long, Tuple2<String, Long>> result = new Tuple2<Long, Tuple2<String, Long>>(1L, new Tuple2<String, Long>("a", 1L));
+				ctx.collect(result);
+			}
 		}
 
 		@Override
-		public Tuple2<Long, Tuple2<String, Long>> next() throws Exception {
-			Tuple2<Long, Tuple2<String, Long>> result = new Tuple2<Long, Tuple2<String, Long>>(1L, new Tuple2<String, Long>("a", 1L));
-			cnt++;
-			return result;
+		public void cancel() {
+
 		}
 	}
 
@@ -612,46 +625,43 @@ public class ComplexIntegrationTest extends StreamingMultipleProgramsTestBase {
 		}
 	}
 
-	private static class RectangleSource extends RichSourceFunction<RectangleClass> {
+	private static class RectangleSource extends RichSourceFunction<Rectangle> {
 		private static final long serialVersionUID = 1L;
-		private transient RectangleClass rectangle;
-		private transient int cnt;
+		private transient Rectangle rectangle;
 
 		public void open(Configuration parameters) throws Exception {
-			rectangle = new RectangleClass(100, 100);
-			cnt = 0;
+			rectangle = new Rectangle(100, 100);
 		}
 
 		@Override
-		public boolean reachedEnd() throws Exception {
-			return cnt >= 100;
+		public void run(SourceContext<Rectangle> ctx) throws Exception {
+			for (int i = 0; i < 100; i++) {
+				ctx.collect(rectangle);
+				rectangle = rectangle.next();
+			}
 		}
 
 		@Override
-		public RectangleClass next() throws Exception {
-			RectangleClass result = rectangle;
-			cnt++;
-			rectangle = rectangle.next();
-			return result;
+		public void cancel() {
 		}
 	}
 
-	private static class RectangleMapFunction implements MapFunction<RectangleClass, Tuple2<RectangleClass, Integer>> {
+	private static class RectangleMapFunction implements MapFunction<Rectangle, Tuple2<Rectangle, Integer>> {
 		private static final long serialVersionUID = 1L;
 		private int counter = 0;
 
 		@Override
-		public Tuple2<RectangleClass, Integer> map(RectangleClass value) throws Exception {
-			return new Tuple2<RectangleClass, Integer>(value, counter++);
+		public Tuple2<Rectangle, Integer> map(Rectangle value) throws Exception {
+			return new Tuple2<Rectangle, Integer>(value, counter++);
 		}
 	}
 
-	private static class MyWindowMapFunction implements WindowMapFunction<Tuple2<RectangleClass, Integer>,
-			Tuple2<RectangleClass, Integer>> {
+	private static class MyWindowMapFunction implements WindowMapFunction<Tuple2<Rectangle, Integer>,
+			Tuple2<Rectangle, Integer>> {
 		private static final long serialVersionUID = 1L;
 
 		@Override
-		public void mapWindow(Iterable<Tuple2<RectangleClass, Integer>> values, Collector<Tuple2<RectangleClass,
+		public void mapWindow(Iterable<Tuple2<Rectangle, Integer>> values, Collector<Tuple2<Rectangle,
 				Integer>> out) throws Exception {
 			out.collect(values.iterator().next());
 		}
@@ -770,23 +780,21 @@ public class ComplexIntegrationTest extends StreamingMultipleProgramsTestBase {
 		}
 	}
 
-	public static class RectangleClass {
-
-		private static final long serialVersionUID = 1L;
+	public static class Rectangle {
 
 		public int a;
 		public int b;
 
 		//default constructor to qualify as Flink POJO
-		public RectangleClass() {}
+		public Rectangle() {}
 
-		public RectangleClass(int a, int b) {
+		public Rectangle(int a, int b) {
 			this.a = a;
 			this.b = b;
 		}
 
-		public RectangleClass next() {
-			return new RectangleClass(a + (b % 11), b + (a % 9));
+		public Rectangle next() {
+			return new Rectangle(a + (b % 11), b + (a % 9));
 		}
 
 		@Override

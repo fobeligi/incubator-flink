@@ -28,7 +28,7 @@ import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.windowing.StreamDiscretizer;
 import org.apache.flink.streaming.api.operators.windowing.WindowFlattener;
 import org.apache.flink.streaming.api.operators.windowing.WindowMerger;
-import org.apache.flink.streaming.runtime.partitioner.DistributePartitioner;
+import org.apache.flink.streaming.runtime.partitioner.RebalancePartitioner;
 
 public class WindowingOptimizer {
 
@@ -52,9 +52,9 @@ public class WindowingOptimizer {
 			}
 		}
 
-		for (Integer flattenerID : flatteners) {
+		for (Integer flattenerId : flatteners) {
 			// Flatteners should have exactly one input
-			StreamNode input = streamGraph.getStreamNode(flattenerID).getInEdges().get(0)
+			StreamNode input = streamGraph.getStreamNode(flattenerId).getInEdges().get(0)
 					.getSourceVertex();
 
 			// Check whether the flatten is applied after a merge
@@ -64,18 +64,18 @@ public class WindowingOptimizer {
 				StreamNode mergeInput = input.getInEdges().get(0).getSourceVertex();
 
 				// We connect the merge input to the flattener directly
-				streamGraph.addEdge(mergeInput.getID(), flattenerID,
-						new DistributePartitioner(true), 0, new ArrayList<String>());
+				streamGraph.addEdge(mergeInput.getId(), flattenerId,
+						new RebalancePartitioner(true), 0, new ArrayList<String>());
 
 				// If the merger is only connected to the flattener we delete it
 				// completely, otherwise we only remove the edge
 				if (input.getOutEdges().size() > 1) {
-					streamGraph.removeEdge(streamGraph.getEdge(input.getID(), flattenerID));
+					streamGraph.removeEdge(streamGraph.getStreamEdge(input.getId(), flattenerId));
 				} else {
 					streamGraph.removeVertex(input);
 				}
 
-				streamGraph.setParallelism(flattenerID, mergeInput.getParallelism());
+				streamGraph.setParallelism(flattenerId, mergeInput.getParallelism());
 			}
 		}
 
@@ -137,14 +137,14 @@ public class WindowingOptimizer {
 			if (matchList.size() > 1) {
 				StreamNode first = matchList.get(0);
 				for (int i = 1; i < matchList.size(); i++) {
-					replaceDiscretizer(streamGraph, matchList.get(i).getID(), first.getID());
+					replaceDiscretizer(streamGraph, matchList.get(i).getId(), first.getId());
 				}
 			}
 		}
 	}
 
 	private static void replaceDiscretizer(StreamGraph streamGraph, Integer toReplaceID,
-			Integer replaceWithID) {
+			Integer replaceWithId) {
 		// Convert to array to create a copy
 		List<StreamEdge> outEdges = new ArrayList<StreamEdge>(streamGraph
 				.getStreamNode(toReplaceID).getOutEdges());
@@ -155,7 +155,7 @@ public class WindowingOptimizer {
 		for (int i = 0; i < numOutputs; i++) {
 			StreamEdge outEdge = outEdges.get(i);
 
-			streamGraph.addEdge(replaceWithID, outEdge.getTargetID(), outEdge.getPartitioner(), 0,
+			streamGraph.addEdge(replaceWithId, outEdge.getTargetId(), outEdge.getPartitioner(), 0,
 					new ArrayList<String>());
 		}
 
