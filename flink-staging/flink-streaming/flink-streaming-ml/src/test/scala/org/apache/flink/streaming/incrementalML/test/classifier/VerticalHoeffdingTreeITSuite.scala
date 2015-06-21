@@ -45,24 +45,23 @@ class VerticalHoeffdingTreeITSuite
     //    val nominalAttributes = Map(0 ->4, 2 ->4, 4 ->4, 6 ->4 8 ->4)
 
     VHTParameters.add(VerticalHoeffdingTree.MinNumberOfInstances, 60)
-    VHTParameters.add(VerticalHoeffdingTree.NumberOfClasses, 3)
+    VHTParameters.add(VerticalHoeffdingTree.NumberOfClasses, 2)
     VHTParameters.add(VerticalHoeffdingTree.Parallelism, 2)
     //        VHTParameters.add(VerticalHoeffdingTree.ModelParallelism, 2)
     //    VHTParameters.add(VerticalHoeffdingTree.OnlyNominalAttributes,true)
     //    VHTParameters.add(VerticalHoeffdingTree.NominalAttributes, nominalAttributes)
 
     val dataPoints = env.readTextFile("/Users/fobeligi/workspace/master-thesis/dataSets/" +
-      "Waveform-MOA/Waveform-2M.arrf").setParallelism(1).map {
+      "clustering/clusteringOutliers-lambda3.txt").map {
       line => {
         var featureList = List[Double]()
         val features = line.split(',')
         for (i <- 0 until features.size - 1) {
           featureList = featureList :+ features(i).trim.toDouble
         }
-        println(featureList)
         LabeledVector(features(features.size - 1).trim.toDouble, DenseVector(featureList.toArray))
       }
-    }.setParallelism(1)
+    }
 
     //    val transformer = Imputer()
     val vhtLearner = VerticalHoeffdingTree(env)
@@ -75,12 +74,12 @@ class VerticalHoeffdingTreeITSuite
 
     val evaluationStream = evaluator.evaluate(streamToEvaluate)
 
-    evaluationStream.writeAsCsv("/Users/fobeligi/workspace/master-thesis/dataSets/Waveform-MOA" +
-      "/sea.csv").setParallelism(1)
+    evaluationStream.writeAsCsv("/Users/fobeligi/workspace/master-thesis/dataSets/clustering" +
+      "/outliers-lambda3-WITH-exclude.csv-1").setParallelism(1)
 
     val changeDetectorParameters = ParameterMap()
-    changeDetectorParameters.add(PageHinkleyTest.Delta, 0.0005)
-    changeDetectorParameters.add(PageHinkleyTest.Lambda, 2.2)
+    changeDetectorParameters.add(PageHinkleyTest.Delta, 0.0001)
+    changeDetectorParameters.add(PageHinkleyTest.Lambda, 2.5)
 
     val changeDetector = PageHinkleyTest()
 
@@ -127,7 +126,7 @@ class UnifiedStreamBatchMapper
   override def flatMap(value: Boolean, out: Collector[Boolean]): Unit = {
     if (value) {
       System.err.println(value)
-      createSubmitBatchJob(counter);
+//      createSubmitBatchJob(counter);
       counter += 1
     }
     else {
