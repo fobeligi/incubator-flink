@@ -23,39 +23,38 @@ Metrics}
 
 
 class PrequentialEvaluator
-  extends Evaluator[(Int, Metrics), (Double, Double, Double, Double)]
+  extends Evaluator[(Int, Metrics), (Double, Double)]
   with Serializable {
 
-  val alpha = 0.995
+//  val alpha = 0.995
   var instancesClassified = 0.0
-  var sumLossFunction = 0.0
+//  var sumLossFunction = 0.0
   var sumLossFunctionWithoutLatent = 0.0
-  var Bdenominator = 0.0
+//  var Bdenominator = 0.0
 
   /** Evaluating model's accuracy with the input observations
     *
     * @param inputDataStream The points to be used for the evaluation.
     *
-    * @return (#instances,fading_factors_errors,prequential,accuracy)
+    * @return (prequential_error,accuracy)
     */
-  override def evaluate(inputDataStream: DataStream[(Int, Metrics)]): DataStream[(Double, Double,
-    Double, Double)] = {
+  override def evaluate(inputDataStream: DataStream[(Int, Metrics)]): DataStream[(Double,
+    Double)] = {
     inputDataStream.map {
       input => {
         val temp = input._2.asInstanceOf[InstanceClassification]
         instancesClassified += 1.0
         if (temp.label != temp.clazz) {
           sumLossFunctionWithoutLatent += 1.0
-          sumLossFunction = 1.0 + alpha * sumLossFunction
+//          sumLossFunction = 1.0 + alpha * sumLossFunction
         }
-        else {
-          sumLossFunction = alpha * sumLossFunction
-        }
+//        else {
+//          sumLossFunction = alpha * sumLossFunction
+//        }
 
-        Bdenominator = 1.0 + alpha * Bdenominator
+//        Bdenominator = 1.0 + alpha * Bdenominator
 
-        (instancesClassified, sumLossFunction / Bdenominator,
-          sumLossFunctionWithoutLatent / instancesClassified,
+        (sumLossFunctionWithoutLatent / instancesClassified,
           ((instancesClassified-sumLossFunctionWithoutLatent)/instancesClassified)*100)
       }
     }.setParallelism(1)

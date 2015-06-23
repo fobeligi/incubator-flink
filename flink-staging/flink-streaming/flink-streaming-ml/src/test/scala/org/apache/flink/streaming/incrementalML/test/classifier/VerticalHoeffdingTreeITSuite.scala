@@ -39,22 +39,22 @@ class VerticalHoeffdingTreeITSuite
 
   behavior of "Flink's Vertical Hoeffding Tree algorithm"
 
-  it should "Create the classification HT of the given data set" in {
+  it should "Create the  VHT of the given data set" in {
 
     val env = StreamExecutionEnvironment.getExecutionEnvironment
 
     val VHTParameters = ParameterMap()
-    //    val nominalAttributes = Map(0 ->4, 2 ->4, 4 ->4, 6 ->4 8 ->4)
+    //    val nominalAttributes = Map(0 ->4, 2 ->4, 4 ->4, 6 ->4, 8 ->4)
 
-    VHTParameters.add(VerticalHoeffdingTree.MinNumberOfInstances, 100)
+    VHTParameters.add(VerticalHoeffdingTree.MinNumberOfInstances, 50)
     VHTParameters.add(VerticalHoeffdingTree.NumberOfClasses, 3)
     VHTParameters.add(VerticalHoeffdingTree.Parallelism, 8)
-//    VHTParameters.add(VerticalHoeffdingTree.ModelParallelism, 4)
+    VHTParameters.add(VerticalHoeffdingTree.ModelParallelism, 4)
     //    VHTParameters.add(VerticalHoeffdingTree.OnlyNominalAttributes,true)
     //    VHTParameters.add(VerticalHoeffdingTree.NominalAttributes, nominalAttributes)
 
     val dataPoints = env.readTextFile("/Users/fobeligi/workspace/master-thesis/dataSets/" +
-      "Waveform-MOA/Waveform-10M.arff").map {
+      "Waveform-MOA/Waveform-10M.csv").map {
       line => {
         var featureList = List[Double]()
         val features = line.split(',')
@@ -77,7 +77,7 @@ class VerticalHoeffdingTreeITSuite
     val evaluationStream = evaluator.evaluate(streamToEvaluate)
 
     evaluationStream.writeAsCsv("/Users/fobeligi/workspace/master-thesis/dataSets/Waveform-MOA" +
-      "/results/Waveform-parall_2_8-att5.csv").setParallelism(1)
+      "/results/Waveform-parall_4_8-att3.csv").setParallelism(1)
 
 //    val changeDetectorParameters = ParameterMap()
 //    changeDetectorParameters.add(PageHinkleyTest.Delta, 0.0005)

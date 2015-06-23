@@ -25,7 +25,7 @@ under the License.
 	<parent>
 		<groupId>org.apache.flink</groupId>
 		<artifactId>flink-streaming-parent</artifactId>
-		<version>0.9-SNAPSHOT</version>
+		<version>0.10-SNAPSHOT</version>
 		<relativePath>..</relativePath>
 	</parent>
 
@@ -80,18 +80,6 @@ under the License.
 			<version>${project.version}</version>
 			<scope>test</scope>
 		</dependency>
-
-		<dependency>
-			<groupId>org.apache.commons</groupId>
-			<artifactId>commons-csv</artifactId>
-			<version>1.1</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.commons</groupId>
-			<artifactId>commons-math3</artifactId>
-			<version>3.2</version>
-		</dependency>
 	</dependencies>
 
 	<build>
@@ -110,6 +98,7 @@ under the License.
 						</goals>
 						<configuration>
 							<artifactItems>
+								<!-- For WordCount example data -->
 								<artifactItem>
 									<groupId>org.apache.flink</groupId>
 									<artifactId>flink-java-examples</artifactId>
@@ -118,6 +107,16 @@ under the License.
 									<overWrite>false</overWrite>
 									<outputDirectory>${project.build.directory}/classes</outputDirectory>
 									<includes>org/apache/flink/examples/java/wordcount/util/WordCountData.class</includes>
+								</artifactItem>
+								<!-- For JSON utilities -->
+								<artifactItem>
+									<groupId>org.apache.flink</groupId>
+									<artifactId>flink-connector-twitter</artifactId>
+									<version>${project.version}</version>
+									<type>jar</type>
+									<overWrite>false</overWrite>
+									<outputDirectory>${project.build.directory}/classes</outputDirectory>
+									<includes>org/apache/flink/streaming/connectors/json/*</includes>
 								</artifactItem>
 							</artifactItems>
 						</configuration>
@@ -202,7 +201,8 @@ under the License.
 
 							<includes>
 								<include>org/apache/flink/streaming/examples/twitter/*.class</include>
-								<include>org/apache/flink/streaming/examples/twitter/util/*.class</include>						
+								<include>org/apache/flink/streaming/examples/twitter/util/*.class</include>
+								<include>org/apache/flink/streaming/connectors/json/*.class</include>
 							</includes>
 						</configuration>
 					</execution>
@@ -349,46 +349,25 @@ under the License.
 						</configuration>
 					</execution>
 
-					<!-- LambdaTriggeredJoin -->
+					<!-- SessionWindowing -->
 					<execution>
-						<id>LambdaTriggeredJoin</id>
+						<id>SessionWindowing</id>
 						<phase>package</phase>
 						<goals>
 							<goal>jar</goal>
 						</goals>
 						<configuration>
-							<classifier>LambdaTriggeredJoin</classifier>
+							<classifier>SessionWindowing</classifier>
 
 							<archive>
 								<manifestEntries>
-									<program-class>org.apache.flink.streaming.examples.unifiedStreamBatch.LambdaTriggeredJoin</program-class>
+									<program-class>org.apache.flink.streaming.examples.windowing.SessionWindowing</program-class>
 								</manifestEntries>
 							</archive>
 
 							<includes>
-								<include>org/apache/flink/streaming/examples/lambda/*.class</include>
-							</includes>
-						</configuration>
-					</execution>
-
-					<!-- LambdaPeriodicJoin -->
-					<execution>
-						<id>LambdaPeriodicJoin</id>
-						<phase>package</phase>
-						<goals>
-							<goal>jar</goal>
-						</goals>
-						<configuration>
-							<classifier>LambdaPeriodicJoin</classifier>
-
-							<archive>
-								<manifestEntries>
-									<program-class>org.apache.flink.streaming.examples.unifiedStreamBatch.LambdaPeriodicJoin</program-class>
-								</manifestEntries>
-							</archive>
-
-							<includes>
-								<include>org/apache/flink/streaming/examples/lambda/*.class</include>
+								<include>org/apache/flink/streaming/examples/windowing/SessionWindowing.class</include>
+								<include>org/apache/flink/streaming/examples/windowing/SessionWindowing$*.class</include>
 							</includes>
 						</configuration>
 					</execution>

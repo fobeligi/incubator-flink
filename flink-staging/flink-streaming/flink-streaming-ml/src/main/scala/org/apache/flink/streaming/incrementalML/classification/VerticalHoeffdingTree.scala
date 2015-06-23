@@ -405,7 +405,7 @@ class GlobalModelMapper(resultingParameters: ParameterMap)
               }
             }
           }
-          println(s"---${VHT.getDecisionTreeSize} ---- VFDT:$VHT")
+          println(s"---${VHT.getDecisionTreeSize} ")//---- VFDT:$VHT")
         }
       }
 

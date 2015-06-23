@@ -37,7 +37,6 @@ import org.apache.flink.api.common.typeinfo.BasicArrayTypeInfo;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.java.ClosureCleaner;
 import org.apache.flink.api.java.Utils;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.io.CsvOutputFormat;
@@ -45,7 +44,6 @@ import org.apache.flink.api.java.io.TextOutputFormat;
 import org.apache.flink.api.java.operators.Keys;
 import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.api.java.typeutils.MissingTypeInfo;
-import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 import org.apache.flink.api.java.typeutils.TypeExtractor;
 import org.apache.flink.core.fs.FileSystem.WriteMode;
 import org.apache.flink.core.fs.Path;
@@ -126,12 +124,10 @@ public class DataStream<OUT> {
 	 * 
 	 * @param environment
 	 *            StreamExecutionEnvironment
-	 * @param operatorType
-	 *            The type of the operator in the component
 	 * @param typeInfo
 	 *            Type of the datastream
 	 */
-	public DataStream(StreamExecutionEnvironment environment, String operatorType, TypeInformation<OUT> typeInfo) {
+	public DataStream(StreamExecutionEnvironment environment, TypeInformation<OUT> typeInfo) {
 		if (environment == null) {
 			throw new NullPointerException("context is null");
 		}
@@ -175,7 +171,7 @@ public class DataStream<OUT> {
 	}
 
 	/**
-	 * Returns the ID of the {@link DataStream}.
+	 * Returns the ID of the {@link DataStream} in the current {@link StreamExecutionEnvironment}.
 	 * 
 	 * @return ID of the DataStream
 	 */
@@ -238,19 +234,15 @@ public class DataStream<OUT> {
 		this.typeInfo = typeInfo;
 	}
 
-	public <F> F clean(F f) {
-		if (getExecutionEnvironment().getConfig().isClosureCleanerEnabled()) {
-			ClosureCleaner.clean(f, true);
-		}
-		ClosureCleaner.ensureSerializable(f);
-		return f;
+	protected <F> F clean(F f) {
+		return getExecutionEnvironment().clean(f);
 	}
 
 	public StreamExecutionEnvironment getExecutionEnvironment() {
 		return environment;
 	}
 
-	protected ExecutionConfig getExecutionConfig() {
+	public ExecutionConfig getExecutionConfig() {
 		return environment.getConfig();
 	}
 
@@ -425,9 +417,11 @@ public class DataStream<OUT> {
 
 	/**
 	 * Sets the partitioning of the {@link DataStream} so that the output tuples
-	 * are broadcasted to every parallel instance of the next component. This
-	 * setting only effects the how the outputs will be distributed between the
-	 * parallel instances of the next processing operator.
+	 * are broadcasted to every parallel instance of the next component.
+	 *
+	 * <p>
+	 * This setting only effects the how the outputs will be distributed between
+	 * the parallel instances of the next processing operator.
 	 * 
 	 * @return The DataStream with broadcast partitioning set.
 	 */
@@ -437,9 +431,11 @@ public class DataStream<OUT> {
 
 	/**
 	 * Sets the partitioning of the {@link DataStream} so that the output tuples
-	 * are shuffled to the next component. This setting only effects the how the
-	 * outputs will be distributed between the parallel instances of the next
-	 * processing operator.
+	 * are shuffled uniformly randomly to the next component.
+	 *
+	 * <p>
+	 * This setting only effects the how the outputs will be distributed between
+	 * the parallel instances of the next processing operator.
 	 * 
 	 * @return The DataStream with shuffle partitioning set.
 	 */
@@ -450,11 +446,13 @@ public class DataStream<OUT> {
 	/**
 	 * Sets the partitioning of the {@link DataStream} so that the output tuples
 	 * are forwarded to the local subtask of the next component (whenever
-	 * possible). This is the default partitioner setting. This setting only
-	 * effects the how the outputs will be distributed between the parallel
-	 * instances of the next processing operator.
+	 * possible).
+	 *
+	 * <p>
+	 * This setting only effects the how the outputs will be distributed between
+	 * the parallel instances of the next processing operator.
 	 * 
-	 * @return The DataStream with shuffle partitioning set.
+	 * @return The DataStream with forward partitioning set.
 	 */
 	public DataStream<OUT> forward() {
 		return setConnectionType(new RebalancePartitioner<OUT>(true));
@@ -462,11 +460,14 @@ public class DataStream<OUT> {
 
 	/**
 	 * Sets the partitioning of the {@link DataStream} so that the output tuples
-	 * are distributed evenly to the next component.This setting only effects
-	 * the how the outputs will be distributed between the parallel instances of
-	 * the next processing operator.
+	 * are distributed evenly to instances of the next component in a Round-robin
+	 * fashion.
+	 *
+	 * <p>
+	 * This setting only effects the how the outputs will be distributed between
+	 * the parallel instances of the next processing operator.
 	 * 
-	 * @return The DataStream with shuffle partitioning set.
+	 * @return The DataStream with rebalance partitioning set.
 	 */
 	public DataStream<OUT> rebalance() {
 		return setConnectionType(new RebalancePartitioner<OUT>(false));
@@ -721,9 +722,7 @@ public class DataStream<OUT> {
 	 * @return The transformed DataStream.
 	 */
 	public SingleOutputStreamOperator<OUT, ?> sum(int positionToSum) {
-		checkFieldRange(positionToSum);
-		return aggregate((AggregationFunction<OUT>) SumAggregator.getSumFunction(positionToSum,
-				getClassAtPos(positionToSum), getType()));
+		return aggregate(new SumAggregator<OUT>(positionToSum, getType(), getExecutionConfig()));
 	}
 
 	/**
@@ -739,8 +738,7 @@ public class DataStream<OUT> {
 	 * @return The transformed DataStream.
 	 */
 	public SingleOutputStreamOperator<OUT, ?> sum(String field) {
-		return aggregate((AggregationFunction<OUT>) SumAggregator.getSumFunction(field, getType(),
-				getExecutionConfig()));
+		return aggregate(new SumAggregator<OUT>(field, getType(), getExecutionConfig()));
 	}
 
 	/**
@@ -752,9 +750,8 @@ public class DataStream<OUT> {
 	 * @return The transformed DataStream.
 	 */
 	public SingleOutputStreamOperator<OUT, ?> min(int positionToMin) {
-		checkFieldRange(positionToMin);
-		return aggregate(ComparableAggregator.getAggregator(positionToMin, getType(),
-				AggregationType.MIN));
+		return aggregate(new ComparableAggregator<OUT>(positionToMin, getType(), AggregationType.MIN,
+				getExecutionConfig()));
 	}
 
 	/**
@@ -770,7 +767,7 @@ public class DataStream<OUT> {
 	 * @return The transformed DataStream.
 	 */
 	public SingleOutputStreamOperator<OUT, ?> min(String field) {
-		return aggregate(ComparableAggregator.getAggregator(field, getType(), AggregationType.MIN,
+		return aggregate(new ComparableAggregator<OUT>(field, getType(), AggregationType.MIN,
 				false, getExecutionConfig()));
 	}
 
@@ -783,9 +780,8 @@ public class DataStream<OUT> {
 	 * @return The transformed DataStream.
 	 */
 	public SingleOutputStreamOperator<OUT, ?> max(int positionToMax) {
-		checkFieldRange(positionToMax);
-		return aggregate(ComparableAggregator.getAggregator(positionToMax, getType(),
-				AggregationType.MAX));
+		return aggregate(new ComparableAggregator<OUT>(positionToMax, getType(), AggregationType.MAX,
+				getExecutionConfig()));
 	}
 
 	/**
@@ -801,7 +797,7 @@ public class DataStream<OUT> {
 	 * @return The transformed DataStream.
 	 */
 	public SingleOutputStreamOperator<OUT, ?> max(String field) {
-		return aggregate(ComparableAggregator.getAggregator(field, getType(), AggregationType.MAX,
+		return aggregate(new ComparableAggregator<OUT>(field, getType(), AggregationType.MAX,
 				false, getExecutionConfig()));
 	}
 
@@ -821,8 +817,8 @@ public class DataStream<OUT> {
 	 * @return The transformed DataStream.
 	 */
 	public SingleOutputStreamOperator<OUT, ?> minBy(String field, boolean first) {
-		return aggregate(ComparableAggregator.getAggregator(field, getType(),
-				AggregationType.MINBY, first, getExecutionConfig()));
+		return aggregate(new ComparableAggregator(field, getType(), AggregationType.MINBY,
+				first, getExecutionConfig()));
 	}
 
 	/**
@@ -841,8 +837,8 @@ public class DataStream<OUT> {
 	 * @return The transformed DataStream.
 	 */
 	public SingleOutputStreamOperator<OUT, ?> maxBy(String field, boolean first) {
-		return aggregate(ComparableAggregator.getAggregator(field, getType(),
-				AggregationType.MAXBY, first, getExecutionConfig()));
+		return aggregate(new ComparableAggregator<OUT>(field, getType(), AggregationType.MAXBY,
+				first, getExecutionConfig()));
 	}
 
 	/**
@@ -887,9 +883,8 @@ public class DataStream<OUT> {
 	 * @return The transformed DataStream.
 	 */
 	public SingleOutputStreamOperator<OUT, ?> minBy(int positionToMinBy, boolean first) {
-		checkFieldRange(positionToMinBy);
-		return aggregate(ComparableAggregator.getAggregator(positionToMinBy, getType(),
-				AggregationType.MINBY, first));
+		return aggregate(new ComparableAggregator<OUT>(positionToMinBy, getType(), AggregationType.MINBY, first,
+				getExecutionConfig()));
 	}
 
 	/**
@@ -934,9 +929,8 @@ public class DataStream<OUT> {
 	 * @return The transformed DataStream.
 	 */
 	public SingleOutputStreamOperator<OUT, ?> maxBy(int positionToMaxBy, boolean first) {
-		checkFieldRange(positionToMaxBy);
-		return aggregate(ComparableAggregator.getAggregator(positionToMaxBy, getType(),
-				AggregationType.MAXBY, first));
+		return aggregate(new ComparableAggregator<OUT>(positionToMaxBy, getType(), AggregationType.MAXBY, first,
+				getExecutionConfig()));
 	}
 
 	/**
@@ -1242,7 +1236,7 @@ public class DataStream<OUT> {
 
 	/**
 	 * Method for passing user defined operators along with the type
-	 * informations that will transform the DataStream.
+	 * information that will transform the DataStream.
 	 * 
 	 * @param operatorName
 	 *            name of the operator, for logging purposes
@@ -1259,7 +1253,7 @@ public class DataStream<OUT> {
 		DataStream<OUT> inputStream = this.copy();
 		@SuppressWarnings({ "unchecked", "rawtypes" })
 		SingleOutputStreamOperator<R, ?> returnStream = new SingleOutputStreamOperator(environment,
-				operatorName, outTypeInfo, operator);
+				outTypeInfo, operator);
 
 		streamGraph.addOperator(returnStream.getId(), operator, getType(), outTypeInfo,
 				operatorName);
@@ -1339,67 +1333,6 @@ public class DataStream<OUT> {
 		this.connectGraph(this.copy(), returnStream.getId(), 0);
 
 		return returnStream;
-	}
-
-	/**
-	 * Gets the class of the field at the given position
-	 * 
-	 * @param pos
-	 *            Position of the field
-	 * @return The class of the field
-	 */
-	@SuppressWarnings("rawtypes")
-	protected Class<?> getClassAtPos(int pos) {
-		Class<?> type;
-		TypeInformation<OUT> outTypeInfo = getType();
-		if (outTypeInfo.isTupleType()) {
-			type = ((TupleTypeInfo) outTypeInfo).getTypeAt(pos).getTypeClass();
-
-		} else if (outTypeInfo instanceof BasicArrayTypeInfo) {
-
-			type = ((BasicArrayTypeInfo) outTypeInfo).getComponentTypeClass();
-
-		} else if (outTypeInfo instanceof PrimitiveArrayTypeInfo) {
-			Class<?> clazz = outTypeInfo.getTypeClass();
-			if (clazz == boolean[].class) {
-				type = Boolean.class;
-			} else if (clazz == short[].class) {
-				type = Short.class;
-			} else if (clazz == int[].class) {
-				type = Integer.class;
-			} else if (clazz == long[].class) {
-				type = Long.class;
-			} else if (clazz == float[].class) {
-				type = Float.class;
-			} else if (clazz == double[].class) {
-				type = Double.class;
-			} else if (clazz == char[].class) {
-				type = Character.class;
-			} else {
-				throw new IndexOutOfBoundsException("Type could not be determined for array");
-			}
-
-		} else if (pos == 0) {
-			type = outTypeInfo.getTypeClass();
-		} else {
-			throw new IndexOutOfBoundsException("Position is out of range");
-		}
-		return type;
-	}
-
-	/**
-	 * Checks if the given field position is allowed for the output type
-	 * 
-	 * @param pos
-	 *            Position to check
-	 */
-	protected void checkFieldRange(int pos) {
-		try {
-			getClassAtPos(pos);
-		} catch (IndexOutOfBoundsException e) {
-			throw new RuntimeException("Selected field is out of range");
-
-		}
 	}
 
 	private void validateUnion(Integer id) {
