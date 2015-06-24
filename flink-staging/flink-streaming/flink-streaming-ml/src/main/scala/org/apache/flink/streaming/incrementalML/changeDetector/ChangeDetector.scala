@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.flink.streaming.incrementalML.inspector
+package org.apache.flink.streaming.incrementalML.changeDetector
 
 import org.apache.flink.ml.common.{ParameterMap, WithParameters}
 import org.apache.flink.streaming.api.scala.DataStream
@@ -28,12 +28,11 @@ trait ChangeDetector[Double, Boolean]
   extends WithParameters {
 
 
-  //TODO:: Decide whether this function should return a boolean value or Unit
   /** Adding another observation to the change detector.
     * Change detector's output is updated with the new data point.
     *
     * @param inputPoint the new input points to change detector
-    * @return Whether a change was detected (returns true) or not (returns false).
+    * @return Whether a change was detected (true) or not (false).
     */
   def detectChange(inputPoint: DataStream[Double], parameters: ParameterMap = ParameterMap.Empty):
   DataStream[Boolean]

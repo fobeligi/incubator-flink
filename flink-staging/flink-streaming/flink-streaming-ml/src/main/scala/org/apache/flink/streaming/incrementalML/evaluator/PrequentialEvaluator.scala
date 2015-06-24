@@ -17,20 +17,25 @@
  */
 package org.apache.flink.streaming.incrementalML.evaluator
 
+import org.apache.flink.api.common.functions.FlatMapFunction
 import org.apache.flink.streaming.api.scala._
-import org.apache.flink.streaming.incrementalML.classification.Metrics.{InstanceClassification,
-Metrics}
+import org.apache.flink.streaming.incrementalML.classification.Metrics.{DelayedInstances,
+InstanceClassification, Metrics}
+import org.apache.flink.util.Collector
 
 
 class PrequentialEvaluator
   extends Evaluator[(Int, Metrics), (Double, Double)]
   with Serializable {
 
-//  val alpha = 0.995
+  //  val alpha = 0.995
   var instancesClassified = 0.0
-//  var sumLossFunction = 0.0
+  //  var sumLossFunction = 0.0
   var sumLossFunctionWithoutLatent = 0.0
-//  var Bdenominator = 0.0
+  //  var Bdenominator = 0.0
+
+  var meanDelayedInstances = 0L
+  var numberOfSplits = 0.0D
 
   /** Evaluating model's accuracy with the input observations
     *
@@ -40,24 +45,35 @@ class PrequentialEvaluator
     */
   override def evaluate(inputDataStream: DataStream[(Int, Metrics)]): DataStream[(Double,
     Double)] = {
-    inputDataStream.map {
-      input => {
-        val temp = input._2.asInstanceOf[InstanceClassification]
-        instancesClassified += 1.0
-        if (temp.label != temp.clazz) {
-          sumLossFunctionWithoutLatent += 1.0
-//          sumLossFunction = 1.0 + alpha * sumLossFunction
+
+    inputDataStream.flatMap(new FlatMapFunction[(Int, Metrics), (Double, Double)] {
+      override def flatMap(input: (Int, Metrics), out: Collector[(Double, Double)]): Unit = {
+
+
+        input._2 match {
+          case temp: InstanceClassification => {
+            instancesClassified += 1.0
+            if (temp.label != temp.clazz) {
+              sumLossFunctionWithoutLatent += 1.0
+              //          sumLossFunction = 1.0 + alpha * sumLossFunction
+            }
+            //        else {
+            //          sumLossFunction = alpha * sumLossFunction
+            //        }
+
+            //        Bdenominator = 1.0 + alpha * Bdenominator
+
+            out.collect(sumLossFunctionWithoutLatent / instancesClassified,
+              ((instancesClassified - sumLossFunctionWithoutLatent) / instancesClassified) * 100)
+          }
+          case inputMetric: DelayedInstances => {
+            numberOfSplits += 1.0
+            meanDelayedInstances += inputMetric.numberOfInstances
+            System.err.println(meanDelayedInstances / numberOfSplits)
+          }
         }
-//        else {
-//          sumLossFunction = alpha * sumLossFunction
-//        }
-
-//        Bdenominator = 1.0 + alpha * Bdenominator
-
-        (sumLossFunctionWithoutLatent / instancesClassified,
-          ((instancesClassified-sumLossFunctionWithoutLatent)/instancesClassified)*100)
       }
-    }.setParallelism(1)
+    }).setParallelism(1)
   }
 }
 

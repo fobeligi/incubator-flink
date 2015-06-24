@@ -15,11 +15,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.flink.streaming.incrementalML.inspector
+package org.apache.flink.streaming.incrementalML.changeDetector
 
 import org.apache.flink.ml.common.{ParameterMap, Parameter}
 import org.apache.flink.streaming.api.scala._
-import org.apache.flink.streaming.incrementalML.inspector.PageHinkleyTest.{Delta, Lambda}
+import org.apache.flink.streaming.incrementalML.changeDetector.PageHinkleyTest.{Delta, Lambda}
 
 /**
  * Page Hinkley Test implementation of [[ChangeDetector]].

@@ -90,7 +90,7 @@ class VerticalHoeffdingTree(
 
     var prequentialEvaluation: DataStream[(Int, Metrics)] = null
 
-    val out = dataPointsStream.iterate[Metrics](10000)(dataPointsStream => {
+    val out = dataPointsStream.iterate[Metrics](100000)(dataPointsStream => {
       val (feedback, output, preqEvalStream) = iterationFunction(dataPointsStream,
         resultingParameters)
       prequentialEvaluation = preqEvalStream
@@ -122,12 +122,12 @@ class VerticalHoeffdingTree(
 
     val prequentialEvaluationStream = mSAds.filter(new FilterFunction[(Int, Metrics)] {
       override def filter(value: (Int, Metrics)): Boolean = {
-        return (value._1 == -3) //InstanceClassification
+        return (value._1 == -3 || value._1 == -4) //InstanceClassification
       }
     }).setParallelism(modelParallelism)
 
     val splitDs = attributes.groupBy(0).union(modelAndSignal.broadcast)
-      .flatMap(new PartialVFDTMetricsMapper(resultingParameters)).setParallelism(
+      .flatMap(new PartialVHTMetricsMapper(resultingParameters)).setParallelism(
         resultingParameters.apply(Parallelism)).flatMap(new DecisionMaker(resultingParameters)).
       setParallelism(1).split(new OutputSelector[Metrics] {
 
@@ -405,7 +405,8 @@ class GlobalModelMapper(resultingParameters: ParameterMap)
               }
             }
           }
-          println(s"---${VHT.getDecisionTreeSize} ")//---- VFDT:$VHT")
+          out.collect((-4,DelayedInstances(evaluationMetric.signalLeafMetrics.sum)))
+          println(s"---${VHT.getDecisionTreeSize}") //-- {evaluationMetric.signalLeafMetrics.sum}")
         }
       }
 
@@ -428,7 +429,7 @@ class GlobalModelMapper(resultingParameters: ParameterMap)
   * This mapper emits values of type [[EvaluationMetric]], which extends [[Metrics]].
   *
   */
-class PartialVFDTMetricsMapper(resultingParameters: ParameterMap)
+class PartialVHTMetricsMapper(resultingParameters: ParameterMap)
   extends FlatMapFunction[(Int, Metrics), Metrics] {
 
   //[LeafId,HashMap[AttributeId,AttributeObserver]]
@@ -461,6 +462,17 @@ class PartialVFDTMetricsMapper(resultingParameters: ParameterMap)
 
       case calcMetricsSignal: CalculateMetricsSignal => {
 
+        //----------------------------------------------------
+//        var signalsFromModelAggregators = mutable.HashMap[Int, Int]()
+//        //(SignalId,(Counter,List(Attr,(entropy,proposedValues))))
+//        val tempMetrics = signalsFromModelAggregators.apply(evaluationMetric.leafId).apply(
+//          evaluationMetric.signalLeafMetrics.sum)
+//
+//        // if all metrics from local processors have been received, then check for
+//        // the best attribute to split.
+//        if (tempMetrics._1 == resultingParameters.apply(Parallelism)) {
+//
+        //----------------------------------------------------
         leafsObserver.getOrElse(calcMetricsSignal.leaf, None) match {
 
           case leafToSplit: mutable.HashMap[Int, AttributeObserver[Metrics]] => {
@@ -574,6 +586,7 @@ class DecisionMaker(resultingParameters: ParameterMap)
 
         out.collect(EvaluationMetric(List(bestValuesToSplit(0)), evaluationMetric.leafId,
           evaluationMetric.signalLeafMetrics))
+
       }
 
       //garbage collection

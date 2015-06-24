@@ -27,7 +27,7 @@ import org.apache.flink.ml.math.{Vector, DenseVector}
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, createTypeInformation =>_}
 import org.apache.flink.streaming.incrementalML.classification.VerticalHoeffdingTree
 import org.apache.flink.streaming.incrementalML.evaluator.PrequentialEvaluator
-import org.apache.flink.streaming.incrementalML.inspector.PageHinkleyTest
+import org.apache.flink.streaming.incrementalML.changeDetector.PageHinkleyTest
 import org.apache.flink.test.util.FlinkTestBase
 import org.apache.flink.util.Collector
 import org.scalatest.{FlatSpec, Matchers}
@@ -46,10 +46,10 @@ class VerticalHoeffdingTreeITSuite
     val VHTParameters = ParameterMap()
     //    val nominalAttributes = Map(0 ->4, 2 ->4, 4 ->4, 6 ->4, 8 ->4)
 
-    VHTParameters.add(VerticalHoeffdingTree.MinNumberOfInstances, 50)
+    VHTParameters.add(VerticalHoeffdingTree.MinNumberOfInstances, 100)
     VHTParameters.add(VerticalHoeffdingTree.NumberOfClasses, 3)
     VHTParameters.add(VerticalHoeffdingTree.Parallelism, 8)
-    VHTParameters.add(VerticalHoeffdingTree.ModelParallelism, 4)
+//    VHTParameters.add(VerticalHoeffdingTree.ModelParallelism, 4)
     //    VHTParameters.add(VerticalHoeffdingTree.OnlyNominalAttributes,true)
     //    VHTParameters.add(VerticalHoeffdingTree.NominalAttributes, nominalAttributes)
 
@@ -77,7 +77,7 @@ class VerticalHoeffdingTreeITSuite
     val evaluationStream = evaluator.evaluate(streamToEvaluate)
 
     evaluationStream.writeAsCsv("/Users/fobeligi/workspace/master-thesis/dataSets/Waveform-MOA" +
-      "/results/Waveform-parall_4_8-att3.csv").setParallelism(1)
+      "/results/Waveform-parall_2_8-test.csv").setParallelism(1)
 
 //    val changeDetectorParameters = ParameterMap()
 //    changeDetectorParameters.add(PageHinkleyTest.Delta, 0.0005)

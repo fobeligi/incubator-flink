@@ -141,8 +141,10 @@ class NumericalAttributeObserver(
       totalInstances) * rightHSEntropy
 
     //    if (attrId==16 || attrId==10 || attrId==13 || attrId == 5) {
-    //      println(s"------entropy: $entropy,  rhs: $rhs, lfs: $lhs,----meanStdPerClass$meanStdPerClass, rightEntropy:$rightHSEntropy, " +
-    //        s"leftEntropy: $leftHSEntropy, class:$attrId, #left: $leftHSInstances, #right: $rightHSInstances, #total: $totalInstances\n")
+    //      println(s"------entropy: $entropy,  rhs: $rhs, lfs: $lhs,
+    // ----meanStdPerClass$meanStdPerClass, rightEntropy:$rightHSEntropy, " +
+    //        s"leftEntropy: $leftHSEntropy, class:$attrId, #left: $leftHSInstances,
+    // #right: $rightHSInstances, #total: $totalInstances\n")
     //    }
 
     entropy
